@@ -1,0 +1,48 @@
+[project]
+name = "reconledger-backend"
+version = "0.1.0"
+description = "ReconLedger API - passive reconnaissance workbench"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.115,<0.116",
+    "uvicorn[standard]>=0.32,<0.33",
+    "httpx>=0.27,<0.28",
+    "pydantic>=2.9,<3",
+    "pydantic-settings>=2.5,<3",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3,<9",
+    "pytest-asyncio>=0.24,<0.25",
+    "pytest-socket>=0.7,<0.8",
+    "respx>=0.21,<0.22",
+    "ruff>=0.6,<0.7",
+    "mypy>=1.11,<2",
+]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["app*"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+# --disable-socket blocks every real socket for the whole suite, no per-test
+# exemptions (PRD 8.1). --allow-hosts is loopback-only: on Windows, asyncio's
+# event loop opens a real loopback socket pair for its own internal wakeup
+# mechanism (nothing to do with test code), and the app itself binds to
+# loopback by default anyway (PRD 8.3), so this does not weaken the guarantee
+# that no test reaches an external host or the assessed target.
+addopts = "--disable-socket --allow-hosts=127.0.0.1,::1 -q"
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.mypy]
+python_version = "3.11"
+strict = true

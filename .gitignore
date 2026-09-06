@@ -1,0 +1,41 @@
+# Secrets
+.env
+*.env.local
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+
+# SQLite data (never commit collected evidence or local job state)
+*.db
+*.sqlite
+*.sqlite3
+backend/app/*.db
+
+# Node / frontend
+node_modules/
+frontend/dist/
+frontend/build/
+.vite/
+
+# Test artifacts
+playwright-report/
+test-results/
+
+# Editors / OS
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
