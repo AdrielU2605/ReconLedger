@@ -14,6 +14,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from app.api import diffs as diffs_api
 from app.api import exports as exports_api
@@ -26,6 +27,7 @@ from app.jobs.runner import GatewayFactory, JobRunner
 from app.jobs.worker_lock import WorkerLock
 from app.logging_config import configure_logging
 from app.security.gateway import build_production_gateway
+from app.security.origins import ALLOWED_FRONTEND_ORIGINS
 
 logger = logging.getLogger("reconledger.main")
 
@@ -92,6 +94,17 @@ def create_app(
             await engine.dispose()
 
     app = FastAPI(title=settings.app_name, version=settings.app_version, lifespan=lifespan)
+    # The dashboard runs on Vite's dev-server origin (or the built static
+    # origin later) while the API binds to its own loopback port - a browser
+    # fetch() between them is cross-origin. This is the single source of
+    # truth for which origins may do that (security/origins.py enforces the
+    # same list again server-side for state-changing requests specifically).
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=list(ALLOWED_FRONTEND_ORIGINS),
+        allow_methods=["GET", "POST", "DELETE"],
+        allow_headers=["Content-Type", "Last-Event-ID"],
+    )
     app.include_router(sources_api.router)
     app.include_router(jobs_api.router)
     app.include_router(exports_api.router)

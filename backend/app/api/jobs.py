@@ -14,8 +14,8 @@ from app.api.dependencies import get_registry, get_runner, get_session, get_sess
 from app.collectors.registry import CollectorRegistry
 from app.jobs.runner import JobRunner
 from app.jobs.service import JobCreationError, create_job
-from app.models.api import JobCreateRequest, JobDetail, JobSummary
-from app.models.db import Job, JobEvent
+from app.models.api import FindingRead, JobCreateRequest, JobDetail, JobSummary
+from app.models.db import Finding, Job, JobEvent
 from app.models.enums import TERMINAL_JOB_STATUSES
 from app.security.origins import enforce_local_origin_and_content_type
 
@@ -51,6 +51,19 @@ async def get_job(job_id: str, session: AsyncSession = Depends(get_session)) -> 
         raise HTTPException(status_code=404, detail=f"Job {job_id!r} does not exist.")
     await session.refresh(job, attribute_names=["collector_runs"])
     return job
+
+
+@router.get("/api/jobs/{job_id}/findings", response_model=list[FindingRead])
+async def list_findings(job_id: str, session: AsyncSession = Depends(get_session)) -> list[Finding]:
+    """Unfiltered listing for CP4's evidence view. Search and filtering
+    (UX-08) are added in CP5 once the FTS5 projection has a consumer."""
+    job = await session.get(Job, job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail=f"Job {job_id!r} does not exist.")
+    result = await session.execute(
+        select(Finding).where(Finding.job_id == job_id).order_by(Finding.category, Finding.retrieved_at)
+    )
+    return list(result.scalars().all())
 
 
 @router.post("/api/jobs/{job_id}/cancel")

@@ -131,6 +131,28 @@ def test_create_job_runs_to_completion_and_persists_findings(client: TestClient)
     assert markdown.status_code == 200
     assert "Echo finding" in markdown.text
 
+    findings = client.get(f"/api/jobs/{job['id']}/findings")
+    assert findings.status_code == 200
+    assert findings.json()[0]["kind"] == "echo.finding"
+
+
+def test_findings_endpoint_404s_for_unknown_job(client: TestClient) -> None:
+    resp = client.get("/api/jobs/does-not-exist/findings")
+    assert resp.status_code == 404
+
+
+def test_cors_preflight_allows_the_vite_dev_origin(client: TestClient) -> None:
+    resp = client.options(
+        "/api/jobs",
+        headers={
+            "Origin": "http://localhost:5173",
+            "Access-Control-Request-Method": "POST",
+            "Access-Control-Request-Headers": "content-type",
+        },
+    )
+    assert resp.status_code == 200
+    assert resp.headers["access-control-allow-origin"] == "http://localhost:5173"
+
 
 def test_create_job_rejects_unattested_request(client: TestClient) -> None:
     resp = client.post(
