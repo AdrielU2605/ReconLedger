@@ -2,15 +2,20 @@ import { useState } from "react";
 import { api } from "./api/client";
 import type { JobDetail } from "./api/types";
 import { LaunchForm } from "./features/launch/LaunchForm";
+import { DiffView } from "./features/diff/DiffView";
 import { FindingsView } from "./features/findings/FindingsView";
 import { FirstRunExplainer } from "./features/help/FirstRunExplainer";
+import { HistoryView } from "./features/history/HistoryView";
 import { ProgressView } from "./features/progress/ProgressView";
 import { SubdomainWorkspace } from "./features/subdomains/SubdomainWorkspace";
 import { useJob } from "./features/progress/useJob";
 
 const TERMINAL_STATUSES = new Set(["completed", "completed_with_warnings", "failed", "canceled"]);
 
+type View = "launch" | "history";
+
 export default function App() {
+  const [view, setView] = useState<View>("launch");
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
   const [cancelling, setCancelling] = useState(false);
   const [helpForcedOpen, setHelpForcedOpen] = useState(false);
@@ -28,10 +33,17 @@ export default function App() {
 
   function handleLaunched(newJob: JobDetail) {
     setActiveJobId(newJob.id);
+    setView("launch");
   }
 
   function handleStartOver() {
     setActiveJobId(null);
+    setView("launch");
+  }
+
+  function handleReopen(jobId: string) {
+    setActiveJobId(jobId);
+    setView("launch");
   }
 
   return (
@@ -39,16 +51,32 @@ export default function App() {
       <header>
         <div className="header-row">
           <h1>ReconLedger</h1>
-          <button type="button" onClick={() => setHelpForcedOpen(true)}>
-            Help
-          </button>
+          <nav className="header-nav">
+            <button
+              type="button"
+              onClick={() => {
+                setActiveJobId(null);
+                setView("launch");
+              }}
+            >
+              New job
+            </button>
+            <button type="button" onClick={() => setView("history")}>
+              History
+            </button>
+            <button type="button" onClick={() => setHelpForcedOpen(true)}>
+              Help
+            </button>
+          </nav>
         </div>
         <p>Passive reconnaissance, one authorized target at a time.</p>
       </header>
 
       <FirstRunExplainer forceOpen={helpForcedOpen} onDismiss={() => setHelpForcedOpen(false)} />
 
-      {!activeJobId && <LaunchForm onLaunched={handleLaunched} />}
+      {view === "history" && !activeJobId && <HistoryView onReopen={handleReopen} />}
+
+      {view === "launch" && !activeJobId && <LaunchForm onLaunched={handleLaunched} />}
 
       {activeJobId && error && <p className="error">{error}</p>}
 
@@ -64,6 +92,7 @@ export default function App() {
             <>
               <FindingsView job={job} />
               <SubdomainWorkspace jobId={job.id} />
+              <DiffView job={job} />
               <button type="button" onClick={handleStartOver}>
                 Start a new job
               </button>

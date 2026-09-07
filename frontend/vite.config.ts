@@ -22,5 +22,10 @@ export default defineConfig({
     environment: "jsdom",
     setupFiles: ["./src/test/setup.ts"],
     css: false,
+    // Without this, a vi.fn() call count (or mockResolvedValue override)
+    // from one test silently carries into the next test in the same file -
+    // exactly the kind of cross-test pollution that produces flaky,
+    // order-dependent failures.
+    clearMocks: true,
   },
 });

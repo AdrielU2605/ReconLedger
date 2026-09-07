@@ -37,6 +37,11 @@ header h1 {
   gap: 1rem;
 }
 
+.header-nav {
+  display: flex;
+  gap: 0.5rem;
+}
+
 .header-row button {
   padding: 0.35rem 0.9rem;
   font-size: 0.9rem;
@@ -309,4 +314,72 @@ button:disabled {
     display: block;
     overflow-x: auto;
   }
+}
+
+.history-list {
+  list-style: none;
+  padding: 0;
+}
+
+.history-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.75rem;
+  margin-bottom: 0.6rem;
+  background: #fff;
+}
+
+.history-target {
+  background: none;
+  border: none;
+  color: var(--accent);
+  font-size: 1rem;
+  font-weight: 600;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+}
+
+.history-target-type {
+  font-weight: normal;
+  color: #555;
+}
+
+.history-meta,
+.history-scope-note {
+  font-size: 0.85rem;
+  color: #555;
+  margin: 0.25rem 0 0;
+}
+
+.history-delete-confirm {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+
+.diff-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.diff-toolbar label {
+  margin: 0;
+  font-weight: normal;
+}
+
+.diff-toolbar select {
+  padding: 0.4rem;
+}
+
+.diff-results h3 {
+  margin-top: 1rem;
 }
