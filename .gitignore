@@ -16,6 +16,8 @@ htmlcov/
 
 # SQLite data (never commit collected evidence or local job state)
 *.db
+*.db-wal
+*.db-shm
 *.sqlite
 *.sqlite3
 backend/app/*.db
@@ -25,6 +27,7 @@ backend/app/*.db
 node_modules/
 frontend/dist/
 frontend/build/
+frontend/*.tsbuildinfo
 .vite/
 
 # Test artifacts
