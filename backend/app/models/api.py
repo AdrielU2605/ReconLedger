@@ -43,6 +43,11 @@ class JobSummary(BaseModel):
     created_at: datetime
     started_at: datetime | None
     finished_at: datetime | None
+    # UX-09: not one of Job's own columns - computed by list_jobs() as a
+    # count of that job's FAILED collector runs and attached after
+    # validation, since JobSummary deliberately excludes the full
+    # collector_runs list (JobDetail carries that) to keep history cheap.
+    warning_count: int = 0
 
 
 class JobDetail(JobSummary):

@@ -74,4 +74,49 @@ describe("FindingsView", () => {
     expect(link).toHaveAttribute("href", "https://rdap.example/domain/example.com");
     expect(link).toHaveAttribute("rel", expect.stringContaining("noopener"));
   });
+
+  it("distinguishes 'no findings match filters' from 'no findings in the job'", async () => {
+    // Baseline (unfiltered) call has one finding; the filtered call (after
+    // typing a search term) returns none - the empty state must say so.
+    mockedApi.listFindings.mockImplementation((_jobId, query = {}) =>
+      Promise.resolve(query.q ? [] : [makeFinding()]),
+    );
+    const user = userEvent.setup();
+    render(<FindingsView job={JOB} />);
+
+    await screen.findByText(/network footprint \(1\)/i);
+    await user.type(screen.getByLabelText(/search evidence/i), "nothing-like-this");
+
+    expect(await screen.findByText(/no findings match these filters/i)).toBeInTheDocument();
+  });
+
+  it("shows a result count that reflects filtering", async () => {
+    mockedApi.listFindings.mockImplementation((_jobId, query = {}) =>
+      Promise.resolve(query.category ? [] : [makeFinding()]),
+    );
+    const user = userEvent.setup();
+    render(<FindingsView job={JOB} />);
+
+    await screen.findByText(/1 result/i);
+    await user.selectOptions(screen.getByLabelText(/^category$/i), "leaked_data");
+
+    expect(await screen.findByText(/0 results \(filtered from 1\)/i)).toBeInTheDocument();
+  });
+
+  it("clear all resets the filters and re-fetches the unfiltered list", async () => {
+    mockedApi.listFindings.mockImplementation((_jobId, query = {}) =>
+      Promise.resolve(query.q ? [] : [makeFinding()]),
+    );
+    const user = userEvent.setup();
+    render(<FindingsView job={JOB} />);
+
+    await screen.findByText(/network footprint \(1\)/i);
+    await user.type(screen.getByLabelText(/search evidence/i), "nothing-like-this");
+    await screen.findByText(/no findings match these filters/i);
+
+    await user.click(await screen.findByRole("button", { name: /clear all/i }));
+
+    expect(await screen.findByText(/network footprint \(1\)/i)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /clear all/i })).not.toBeInTheDocument();
+  });
 });

@@ -1,10 +1,13 @@
 import type {
   ApiErrorBody,
+  Category,
+  DiffResponse,
   FindingRead,
   JobCreateRequest,
   JobDetail,
   JobSummary,
   SourceRead,
+  SubdomainRowRead,
 } from "./types";
 
 export class ApiError extends Error {
@@ -40,6 +43,21 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return (await response.json()) as T;
 }
 
+export interface FindingsQuery {
+  q?: string;
+  category?: Category;
+  collector?: string;
+}
+
+function toQueryString(params: FindingsQuery): string {
+  const search = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value) search.set(key, value);
+  }
+  const text = search.toString();
+  return text ? `?${text}` : "";
+}
+
 export const api = {
   listSources: (): Promise<SourceRead[]> => request("/api/sources"),
 
@@ -50,7 +68,15 @@ export const api = {
 
   getJob: (jobId: string): Promise<JobDetail> => request(`/api/jobs/${jobId}`),
 
-  listFindings: (jobId: string): Promise<FindingRead[]> => request(`/api/jobs/${jobId}/findings`),
+  listFindings: (jobId: string, query: FindingsQuery = {}): Promise<FindingRead[]> =>
+    request(`/api/jobs/${jobId}/findings${toQueryString(query)}`),
+
+  listSubdomains: (jobId: string): Promise<SubdomainRowRead[]> => request(`/api/jobs/${jobId}/subdomains`),
+
+  subdomainsCsvUrl: (jobId: string): string => `/api/jobs/${jobId}/subdomains.csv`,
+
+  getDiff: (jobId: string, against: string): Promise<DiffResponse> =>
+    request(`/api/jobs/${jobId}/diff?against=${encodeURIComponent(against)}`),
 
   cancelJob: (jobId: string): Promise<{ status: string }> =>
     request(`/api/jobs/${jobId}/cancel`, { method: "POST" }),

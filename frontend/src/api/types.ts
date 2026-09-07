@@ -22,6 +22,9 @@ export type FindingRead = components["schemas"]["FindingRead"];
 export type SourceRead = components["schemas"]["SourceRead"];
 export type SubdomainRowRead = components["schemas"]["SubdomainRowRead"];
 export type JobCreateRequest = components["schemas"]["JobCreateRequest"];
+export type DiffFindingRead = components["schemas"]["DiffFindingRead"];
+export type DiffChangedPair = components["schemas"]["DiffChangedPair"];
+export type DiffResponse = components["schemas"]["DiffResponse"];
 
 // Not part of the OpenAPI schema: a validation error body (FastAPI's
 // default exception handler shape) and the SSE message payload shape.

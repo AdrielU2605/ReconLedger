@@ -6,20 +6,21 @@ import json
 from collections.abc import AsyncIterator
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
-from starlette.responses import StreamingResponse
+from starlette.responses import PlainTextResponse, StreamingResponse
 
 from app.api.dependencies import get_registry, get_runner, get_session, get_session_factory
 from app.collectors.registry import CollectorRegistry
 from app.jobs.runner import JobRunner
 from app.jobs.service import JobCreationError, create_job
 from app.models.api import FindingRead, JobCreateRequest, JobDetail, JobSummary, SubdomainRowRead
-from app.models.db import Finding, Job, JobEvent
-from app.models.enums import TERMINAL_JOB_STATUSES, Category
+from app.models.db import CollectorRun, Finding, Job, JobEvent
+from app.models.enums import TERMINAL_JOB_STATUSES, Category, CollectorStatus
 from app.security.origins import enforce_local_origin_and_content_type
+from app.services.csv_export import build_subdomains_csv
 from app.services.search import find_matching_finding_ids
-from app.services.subdomains import aggregate_subdomains
+from app.services.subdomains import SubdomainRow, aggregate_subdomains
 
 router = APIRouter(tags=["jobs"], dependencies=[Depends(enforce_local_origin_and_content_type)])
 
@@ -41,9 +42,28 @@ async def create_job_endpoint(
 
 
 @router.get("/api/jobs", response_model=list[JobSummary])
-async def list_jobs(session: AsyncSession = Depends(get_session)) -> list[Job]:
-    result = await session.execute(select(Job).order_by(Job.created_at.desc()))
-    return list(result.scalars().all())
+async def list_jobs(session: AsyncSession = Depends(get_session)) -> list[JobSummary]:
+    """UX-09 history: target, type, status, time, selected sources, and a
+    warning count (failed collector runs) - the last one computed here via
+    an aggregate join rather than loading every job's full collector_runs
+    list, which is what makes JobDetail heavier than JobSummary."""
+    warning_counts = (
+        select(CollectorRun.job_id, func.count(CollectorRun.id).label("warning_count"))
+        .where(CollectorRun.status == CollectorStatus.FAILED)
+        .group_by(CollectorRun.job_id)
+        .subquery()
+    )
+    result = await session.execute(
+        select(Job, func.coalesce(warning_counts.c.warning_count, 0))
+        .outerjoin(warning_counts, warning_counts.c.job_id == Job.id)
+        .order_by(Job.created_at.desc())
+    )
+    summaries = []
+    for job, warning_count in result.all():
+        summary = JobSummary.model_validate(job)
+        summary.warning_count = warning_count
+        summaries.append(summary)
+    return summaries
 
 
 @router.get("/api/jobs/{job_id}", response_model=JobDetail)
@@ -85,15 +105,32 @@ async def list_findings(
     return list(result.scalars().all())
 
 
-@router.get("/api/jobs/{job_id}/subdomains", response_model=list[SubdomainRowRead])
-async def list_subdomains(job_id: str, session: AsyncSession = Depends(get_session)) -> list[SubdomainRowRead]:
+async def _get_subdomain_rows(job_id: str, session: AsyncSession) -> tuple[Job, list[SubdomainRow]]:
     job = await session.get(Job, job_id)
     if job is None:
         raise HTTPException(status_code=404, detail=f"Job {job_id!r} does not exist.")
     result = await session.execute(select(Finding).where(Finding.job_id == job_id))
     findings = list(result.scalars().all())
-    rows = aggregate_subdomains(job.target_normalized, findings)
+    return job, aggregate_subdomains(job.target_normalized, findings)
+
+
+@router.get("/api/jobs/{job_id}/subdomains", response_model=list[SubdomainRowRead])
+async def list_subdomains(job_id: str, session: AsyncSession = Depends(get_session)) -> list[SubdomainRowRead]:
+    _job, rows = await _get_subdomain_rows(job_id, session)
     return [SubdomainRowRead(**row.__dict__) for row in rows]
+
+
+@router.get("/api/jobs/{job_id}/subdomains.csv", response_model=None)
+async def export_subdomains_csv(job_id: str, session: AsyncSession = Depends(get_session)) -> PlainTextResponse:
+    """FR-11: formula-safe UTF-8 CSV, generated entirely from persisted
+    evidence - no provider calls."""
+    _job, rows = await _get_subdomain_rows(job_id, session)
+    csv_text = build_subdomains_csv(rows)
+    return PlainTextResponse(
+        csv_text,
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="reconledger-{job_id}-subdomains.csv"'},
+    )
 
 
 @router.post("/api/jobs/{job_id}/cancel")

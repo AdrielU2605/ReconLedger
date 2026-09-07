@@ -12,6 +12,7 @@ function makeJob(overrides: Partial<JobDetail> = {}): JobDetail {
     target_type: "domain",
     status: "running",
     selected_sources: ["rdap"],
+    warning_count: 0,
     scope_note: null,
     created_at: "2026-01-01T00:00:00Z",
     started_at: "2026-01-01T00:00:01Z",

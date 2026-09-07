@@ -444,6 +444,11 @@
           },
           "target_type": {
             "$ref": "#/components/schemas/TargetType"
+          },
+          "warning_count": {
+            "default": 0,
+            "title": "Warning Count",
+            "type": "integer"
           }
         },
         "required": [
@@ -543,6 +548,11 @@
           },
           "target_type": {
             "$ref": "#/components/schemas/TargetType"
+          },
+          "warning_count": {
+            "default": 0,
+            "title": "Warning Count",
+            "type": "integer"
           }
         },
         "required": [
@@ -729,6 +739,7 @@
   "paths": {
     "/api/jobs": {
       "get": {
+        "description": "UX-09 history: target, type, status, time, selected sources, and a\nwarning count (failed collector runs) - the last one computed here via\nan aggregate join rather than loading every job's full collector_runs\nlist, which is what makes JobDetail heavier than JobSummary.",
         "operationId": "list_jobs_api_jobs_get",
         "responses": {
           "200": {
@@ -1208,6 +1219,47 @@
           }
         },
         "summary": "List Subdomains",
+        "tags": [
+          "jobs"
+        ]
+      }
+    },
+    "/api/jobs/{job_id}/subdomains.csv": {
+      "get": {
+        "description": "FR-11: formula-safe UTF-8 CSV, generated entirely from persisted\nevidence - no provider calls.",
+        "operationId": "export_subdomains_csv_api_jobs__job_id__subdomains_csv_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Export Subdomains Csv",
         "tags": [
           "jobs"
         ]

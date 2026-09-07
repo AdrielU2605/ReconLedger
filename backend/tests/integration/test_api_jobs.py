@@ -81,11 +81,31 @@ class _EchoCollector:
         ]
 
 
+class _FailingCollector:
+    def __init__(self) -> None:
+        self.metadata = CollectorMetadata(
+            name="failing",
+            display_name="Failing",
+            supported_targets=frozenset({TargetType.DOMAIN, TargetType.IP}),
+            categories=frozenset({Category.NETWORK_FOOTPRINT}),
+            required_credentials=(),
+            provider_hosts=frozenset(),
+            key_help_url=None,
+            rate_policy=RatePolicy(requests_per_period=1, period_seconds=1, burst=1, concurrency=1),
+            cache_policy=CachePolicy(positive_ttl_seconds=1, negative_ttl_seconds=1, schema_version="1"),
+            test_only=True,
+        )
+
+    async def run(self, context) -> list[CollectedFinding]:
+        raise RuntimeError("deliberately fails for warning_count coverage")
+
+
 @pytest.fixture
 def client(db_url: str, tmp_path):
     settings = Settings(_env_file=None, database_url=db_url, worker_lock_path=str(tmp_path / "worker.lock"))
     registry = CollectorRegistry()
     registry.register(_EchoCollector(), allow_test_only=True)
+    registry.register(_FailingCollector(), allow_test_only=True)
     app = create_app(settings, registry=registry, gateway_factory=_fake_gateway_factory)
     with TestClient(app) as test_client:
         yield test_client
@@ -152,6 +172,11 @@ def test_create_job_runs_to_completion_and_persists_findings(client: TestClient)
     subdomains = client.get(f"/api/jobs/{job['id']}/subdomains")
     assert subdomains.status_code == 200
     assert subdomains.json() == []
+
+    csv_export = client.get(f"/api/jobs/{job['id']}/subdomains.csv")
+    assert csv_export.status_code == 200
+    assert csv_export.headers["content-type"].startswith("text/csv")
+    assert csv_export.text.strip() == "subdomain,source_count,sources,first_seen_at,last_seen_at,wildcard,in_scope"
 
 
 def test_findings_endpoint_404s_for_unknown_job(client: TestClient) -> None:
@@ -246,3 +271,23 @@ def test_sse_stream_reports_progress_and_terminates(client: TestClient) -> None:
     assert "collector_started" in event_types
     assert "collector_finished" in event_types
     assert "job_finished" in event_types
+
+
+def test_list_jobs_reports_a_warning_count_from_failed_collectors(client: TestClient) -> None:
+    created = client.post(
+        "/api/jobs",
+        json={"target": "example.com", "selected_sources": ["echo", "failing"], "attestation_confirmed": True},
+    ).json()
+    job = _wait_for_terminal(client, created["id"])
+    assert job["status"] == "completed_with_warnings"
+
+    listing = client.get("/api/jobs").json()
+    summary = next(j for j in listing if j["id"] == job["id"])
+    assert summary["warning_count"] == 1
+
+
+def test_list_jobs_reports_zero_warnings_for_a_clean_completion(client: TestClient) -> None:
+    job = _wait_for_terminal(client, _launch(client)["id"])
+    listing = client.get("/api/jobs").json()
+    summary = next(j for j in listing if j["id"] == job["id"])
+    assert summary["warning_count"] == 0

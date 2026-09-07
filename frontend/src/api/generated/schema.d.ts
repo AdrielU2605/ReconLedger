@@ -11,7 +11,13 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List Jobs */
+        /**
+         * List Jobs
+         * @description UX-09 history: target, type, status, time, selected sources, and a
+         *     warning count (failed collector runs) - the last one computed here via
+         *     an aggregate join rather than loading every job's full collector_runs
+         *     list, which is what makes JobDetail heavier than JobSummary.
+         */
         get: operations["list_jobs_api_jobs_get"];
         put?: never;
         /** Create Job Endpoint */
@@ -144,6 +150,27 @@ export interface paths {
         };
         /** List Subdomains */
         get: operations["list_subdomains_api_jobs__job_id__subdomains_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/jobs/{job_id}/subdomains.csv": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export Subdomains Csv
+         * @description FR-11: formula-safe UTF-8 CSV, generated entirely from persisted
+         *     evidence - no provider calls.
+         */
+        get: operations["export_subdomains_csv_api_jobs__job_id__subdomains_csv_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -344,6 +371,11 @@ export interface components {
             /** Target Normalized */
             target_normalized: string;
             target_type: components["schemas"]["TargetType"];
+            /**
+             * Warning Count
+             * @default 0
+             */
+            warning_count: number;
         };
         /**
          * JobStatus
@@ -373,6 +405,11 @@ export interface components {
             /** Target Normalized */
             target_normalized: string;
             target_type: components["schemas"]["TargetType"];
+            /**
+             * Warning Count
+             * @default 0
+             */
+            warning_count: number;
         };
         /** SourceRead */
         SourceRead: {
@@ -728,6 +765,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SubdomainRowRead"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    export_subdomains_csv_api_jobs__job_id__subdomains_csv_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */

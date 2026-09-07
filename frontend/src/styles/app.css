@@ -236,3 +236,77 @@ button:disabled {
   color: #555;
   font-style: italic;
 }
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.search-toolbar,
+.subdomain-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.search-toolbar label,
+.subdomain-toolbar label {
+  margin: 0;
+  font-weight: normal;
+}
+
+.search-toolbar input[type="text"],
+.subdomain-toolbar input[type="text"] {
+  width: auto;
+  min-width: 200px;
+  margin: 0;
+}
+
+.search-toolbar select {
+  padding: 0.4rem;
+}
+
+.result-count,
+.copy-feedback {
+  font-size: 0.9rem;
+  color: #444;
+}
+
+.subdomain-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 0.5rem;
+}
+
+.subdomain-table th,
+.subdomain-table td {
+  text-align: left;
+  padding: 0.4rem 0.6rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.subdomain-table th button {
+  background: none;
+  border: none;
+  color: var(--text);
+  padding: 0;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+@media (max-width: 768px) {
+  .subdomain-table,
+  .collector-table {
+    display: block;
+    overflow-x: auto;
+  }
+}

@@ -5,6 +5,7 @@ import { LaunchForm } from "./features/launch/LaunchForm";
 import { FindingsView } from "./features/findings/FindingsView";
 import { FirstRunExplainer } from "./features/help/FirstRunExplainer";
 import { ProgressView } from "./features/progress/ProgressView";
+import { SubdomainWorkspace } from "./features/subdomains/SubdomainWorkspace";
 import { useJob } from "./features/progress/useJob";
 
 const TERMINAL_STATUSES = new Set(["completed", "completed_with_warnings", "failed", "canceled"]);
@@ -62,6 +63,7 @@ export default function App() {
           {TERMINAL_STATUSES.has(job.status) && (
             <>
               <FindingsView job={job} />
+              <SubdomainWorkspace jobId={job.id} />
               <button type="button" onClick={handleStartOver}>
                 Start a new job
               </button>
