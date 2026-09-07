@@ -27,6 +27,7 @@ from app.models.enums import CollectorStatus, JobStatus
 from app.security.errors import GatewayError
 from app.security.gateway import OutboundGateway, build_production_gateway
 from app.security.targets import ClassifiedTarget
+from app.services.cache import CacheAccess
 
 logger = logging.getLogger("reconledger.runner")
 
@@ -251,6 +252,11 @@ class JobRunner:
             target=target,
             scope_note=scope_note,
             gateway=gateway,
+            cache=CacheAccess(
+                session_factory=self._session_factory,
+                collector=collector_name,
+                schema_version=collector.metadata.cache_policy.schema_version,
+            ),
             cancellation=cancellation,
             job_deadline_monotonic=time.monotonic() + self._settings.job_budget_seconds,
             collector_budget_seconds=self._settings.collector_budget_seconds,
@@ -260,15 +266,15 @@ class JobRunner:
         try:
             findings = await collector.run(context)
         except CollectorError as exc:
-            await self._finish_collector(job_id, collector_run_id, collector_name, exc.resulting_status, exc.safe_error_code, exc.safe_error_message, 0)
+            await self._finish_collector(job_id, collector_run_id, collector_name, exc.resulting_status, exc.safe_error_code, exc.safe_error_message, 0, context.cache_hit)
             return
         except GatewayError as exc:
             translated = translate_gateway_error(collector_name, exc)
-            await self._finish_collector(job_id, collector_run_id, collector_name, translated.resulting_status, translated.safe_error_code, translated.safe_error_message, 0)
+            await self._finish_collector(job_id, collector_run_id, collector_name, translated.resulting_status, translated.safe_error_code, translated.safe_error_message, 0, context.cache_hit)
             return
         except Exception:
             logger.exception("collector_unexpected_error", extra={"collector": collector_name, "job_id": job_id})
-            await self._finish_collector(job_id, collector_run_id, collector_name, CollectorStatus.FAILED, "unexpected_error", "An unexpected internal error occurred.", 0)
+            await self._finish_collector(job_id, collector_run_id, collector_name, CollectorStatus.FAILED, "unexpected_error", "An unexpected internal error occurred.", 0, context.cache_hit)
             return
 
         async with self._session_factory() as session:
@@ -291,7 +297,7 @@ class JobRunner:
                             fingerprint=cf.fingerprint,
                         )
                     )
-        await self._finish_collector(job_id, collector_run_id, collector_name, CollectorStatus.DONE, None, None, len(findings))
+        await self._finish_collector(job_id, collector_run_id, collector_name, CollectorStatus.DONE, None, None, len(findings), context.cache_hit)
 
     async def _finish_collector(
         self,
@@ -302,6 +308,7 @@ class JobRunner:
         safe_error_code: str | None,
         safe_error_message: str | None,
         finding_count: int,
+        cache_hit: bool = False,
     ) -> None:
         async with self._session_factory() as session:
             async with session.begin():
@@ -314,6 +321,7 @@ class JobRunner:
                         safe_error_code=safe_error_code,
                         safe_error_message=safe_error_message,
                         finding_count=finding_count,
+                        cache_hit=cache_hit,
                     )
                 )
                 await events.emit(

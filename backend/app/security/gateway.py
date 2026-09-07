@@ -51,7 +51,9 @@ class ValidatingTransport(httpx.AsyncBaseTransport):
     This is the "hooks httpx connection establishment" checkpoint: resolution
     and the forbidden-range/deny-list check happen here, immediately before the
     request is handed off, so there is no window between "we checked" and "we
-    connected" for DNS to change underneath us.
+    connected" for DNS to change underneath us. Because every redirect hop is
+    re-issued as a brand new request through this same transport (see
+    OutboundGateway.get), a followed redirect gets this same validation again.
     """
 
     def __init__(self, *, inner: httpx.AsyncBaseTransport, resolver: Resolver, deny_list: TargetDenyList) -> None:
@@ -97,9 +99,8 @@ def parse_json_safely(response: httpx.Response, *, host: str) -> Any:
     """Generic structural guard for untrusted provider JSON.
 
     Per-field/per-shape limits (expected keys, record counts, nesting specific
-    to a provider's schema) are enforced by each collector's Pydantic model,
-    added alongside that collector starting in CP3. This function only
-    guarantees the payload is well-formed JSON at all.
+    to a provider's schema) are enforced by each collector's own parser.
+    This function only guarantees the payload is well-formed JSON at all.
     """
     try:
         return json.loads(response.content)
@@ -108,6 +109,14 @@ def parse_json_safely(response: httpx.Response, *, host: str) -> Any:
 
 
 DohResolveFn = Callable[["OutboundGateway", str], Awaitable[list[IPAddress]]]
+RedirectHostValidator = Callable[[str], bool]
+
+
+class _FollowRedirect(Exception):
+    """Internal control-flow signal only - never escapes OutboundGateway.get()."""
+
+    def __init__(self, location: str) -> None:
+        self.location = location
 
 
 class OutboundGateway:
@@ -169,13 +178,25 @@ class OutboundGateway:
         headers: dict[str, str] | None = None,
         max_response_bytes: int = DEFAULT_MAX_RESPONSE_BYTES,
         retry_policy: RetryPolicy | None = None,
+        timeout_seconds: float | None = None,
+        allow_redirect_to: RedirectHostValidator | None = None,
+        max_redirects: int = 5,
     ) -> httpx.Response:
         """Perform a validated, retried, rate-aware GET. This is the only request
-        method exposed for MVP collectors, all of which are read-only."""
+        method exposed for MVP collectors, all of which are read-only.
+
+        Redirects are rejected by default (FR-03). Passing `allow_redirect_to`
+        lets a collector opt in for exactly the case PRD 8.1 describes (e.g.
+        RDAP bootstrap results) - each hop is revalidated: HTTPS-only, the new
+        host must pass the validator, and it goes through the same
+        destination-IP/deny-list check as any other request, since it is
+        re-issued as a brand new request through this same client.
+        """
         if not self._deny_list.seeded and not self._bootstrapping:
             raise DenyListUnpopulatedError()
 
-        host = httpx.URL(url).host
+        current_url = url
+        host = httpx.URL(current_url).host
         if host not in allowed_hosts:
             raise DisallowedHostError(host)
 
@@ -185,16 +206,63 @@ class OutboundGateway:
             cap_delay_seconds=self._settings.retry_cap_delay_seconds,
         )
         request_headers = {"User-Agent": self._settings.user_agent, **(headers or {})}
+        request_timeout = (
+            httpx.Timeout(
+                connect=self._settings.connect_timeout_seconds,
+                read=timeout_seconds,
+                write=timeout_seconds,
+                pool=timeout_seconds,
+            )
+            if timeout_seconds is not None
+            else None
+        )
         start = time.monotonic()
+        redirects_followed = 0
+
+        while True:
+            try:
+                return await self._request_with_retries(
+                    current_url, host, request_headers, max_response_bytes, policy, request_timeout, start,
+                    allow_redirects=allow_redirect_to is not None,
+                )
+            except _FollowRedirect as redirect:
+                next_url = httpx.URL(current_url).join(redirect.location)
+                if (
+                    allow_redirect_to is None
+                    or redirects_followed >= max_redirects
+                    or next_url.scheme != "https"
+                    or not allow_redirect_to(next_url.host)
+                ):
+                    raise RedirectRejectedError(
+                        current_url, redirect.location, "redirect target not allowed or max redirects exceeded"
+                    ) from None
+                redirects_followed += 1
+                current_url = str(next_url)
+                host = next_url.host
+
+    async def _request_with_retries(
+        self,
+        url: str,
+        host: str,
+        request_headers: dict[str, str],
+        max_response_bytes: int,
+        policy: RetryPolicy,
+        request_timeout: httpx.Timeout | None,
+        start: float,
+        *,
+        allow_redirects: bool,
+    ) -> httpx.Response:
         last_exception: Exception | None = None
 
         for attempt in range(1, policy.max_attempts + 1):
-            elapsed = time.monotonic() - start
-            if elapsed > policy.total_budget_seconds:
+            if time.monotonic() - start > policy.total_budget_seconds:
                 break
             attempt_start = time.monotonic()
             try:
-                response = await self._client.get(url, headers=request_headers)
+                if request_timeout is not None:
+                    response = await self._client.get(url, headers=request_headers, timeout=request_timeout)
+                else:
+                    response = await self._client.get(url, headers=request_headers)
             except (httpx.TimeoutException, httpx.TransportError) as exc:
                 last_exception = exc
                 logger.warning(
@@ -209,15 +277,12 @@ class OutboundGateway:
             latency_ms = (time.monotonic() - attempt_start) * 1000
             logger.info(
                 "provider_request",
-                extra={
-                    "host": host,
-                    "attempt": attempt,
-                    "latency_ms": latency_ms,
-                    "cache_outcome": "miss",
-                },
+                extra={"host": host, "attempt": attempt, "latency_ms": latency_ms, "cache_outcome": "miss"},
             )
 
             if response.status_code in _REDIRECT_STATUS_CODES:
+                if allow_redirects:
+                    raise _FollowRedirect(response.headers.get("location", ""))
                 raise RedirectRejectedError(url, response.headers.get("location", ""), "redirects disabled by default")
 
             if response.status_code == 429:

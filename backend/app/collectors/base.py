@@ -16,6 +16,7 @@ from typing import Any, Protocol
 from app.models.enums import Category, Confidence, TargetType
 from app.security.gateway import OutboundGateway
 from app.security.targets import ClassifiedTarget
+from app.services.cache import CacheAccess
 
 
 @dataclass(frozen=True)
@@ -82,9 +83,14 @@ class CollectorContext:
     target: ClassifiedTarget
     scope_note: str | None
     gateway: OutboundGateway
+    cache: CacheAccess
     cancellation: asyncio.Event
     job_deadline_monotonic: float
     collector_budget_seconds: float
+    cache_hit: bool = False
+    """Set to True by the collector itself when it served its result entirely
+    from context.cache, without calling the gateway. Read by the runner
+    after run() returns to record CollectorRun.cache_hit."""
 
 
 class Collector(Protocol):
