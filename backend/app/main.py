@@ -22,9 +22,10 @@ from app.api import sources as sources_api
 from app.collectors.registry import CollectorRegistry, get_production_registry
 from app.config import Settings, get_settings
 from app.db.session import create_engine, enable_wal_mode, make_session_factory
-from app.jobs.runner import JobRunner
+from app.jobs.runner import GatewayFactory, JobRunner
 from app.jobs.worker_lock import WorkerLock
 from app.logging_config import configure_logging
+from app.security.gateway import build_production_gateway
 
 logger = logging.getLogger("reconledger.main")
 
@@ -40,7 +41,15 @@ async def _worker_loop(runner: JobRunner) -> None:
         await runner.run_job(job_id)
 
 
-def create_app(settings: Settings | None = None, *, registry: CollectorRegistry | None = None) -> FastAPI:
+def create_app(
+    settings: Settings | None = None,
+    *,
+    registry: CollectorRegistry | None = None,
+    gateway_factory: GatewayFactory = build_production_gateway,
+) -> FastAPI:
+    """`gateway_factory` exists so tests can inject a fully mocked gateway -
+    every real collector run in this app's tests must be as hermetic as the
+    gateway's own unit tests, with no exception for "just the API layer"."""
     settings = settings or get_settings()
 
     @asynccontextmanager
@@ -50,7 +59,12 @@ def create_app(settings: Settings | None = None, *, registry: CollectorRegistry 
             pass
         session_factory = make_session_factory(engine)
         active_registry = registry or get_production_registry()
-        runner = JobRunner(session_factory=session_factory, registry=active_registry, settings=settings)
+        runner = JobRunner(
+            session_factory=session_factory,
+            registry=active_registry,
+            settings=settings,
+            gateway_factory=gateway_factory,
+        )
 
         lock = WorkerLock(Path(settings.worker_lock_path))
         lock.acquire(external_worker_configured=settings.external_worker_configured)

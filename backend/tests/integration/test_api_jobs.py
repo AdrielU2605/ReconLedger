@@ -7,9 +7,11 @@ observe it finishing.
 """
 from __future__ import annotations
 
+import ipaddress
 import time
 from datetime import datetime, timezone
 
+import httpx
 import pytest
 from fastapi.testclient import TestClient
 
@@ -18,8 +20,34 @@ from app.collectors.registry import CollectorRegistry
 from app.config import Settings
 from app.main import create_app
 from app.models.enums import Category, TargetType
+from app.security.gateway import OutboundGateway
+from app.security.network import StaticResolver
 
 TERMINAL_STATUSES = {"completed", "completed_with_warnings", "failed", "canceled"}
+
+GOOGLE_DOH_HOST = "dns.google"
+
+
+def _fake_gateway_factory(settings: Settings) -> OutboundGateway:
+    """Every job in these tests uses a domain target, so the runner always
+    seeds its deny-list via a DoH bootstrap call to dns.google before the
+    echo collector (which never touches the gateway itself) runs. That call
+    must never reach the real network - not "usually blocked by
+    --disable-socket", but structurally incapable of it, the same way every
+    other test in this suite works.
+    """
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        # The gateway pins the connection to the resolved IP before this
+        # inner transport ever sees the request, so request.url.host is
+        # already the pinned address, not the logical hostname - check the
+        # preserved Host header instead (see test_deny_list_seeding.py).
+        if request.headers.get("host") == GOOGLE_DOH_HOST:
+            return httpx.Response(200, json={"Answer": [{"data": "93.184.216.34"}]})
+        raise AssertionError(f"unexpected provider request to {request.url} (host header: {request.headers.get('host')})")
+
+    resolver = StaticResolver(table={GOOGLE_DOH_HOST: [ipaddress.ip_address("8.8.8.8")]})
+    return OutboundGateway(transport=httpx.MockTransport(handler), resolver=resolver, settings=settings)
 
 
 class _EchoCollector:
@@ -58,7 +86,7 @@ def client(db_url: str, tmp_path):
     settings = Settings(_env_file=None, database_url=db_url, worker_lock_path=str(tmp_path / "worker.lock"))
     registry = CollectorRegistry()
     registry.register(_EchoCollector(), allow_test_only=True)
-    app = create_app(settings, registry=registry)
+    app = create_app(settings, registry=registry, gateway_factory=_fake_gateway_factory)
     with TestClient(app) as test_client:
         yield test_client
 
