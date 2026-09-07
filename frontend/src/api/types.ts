@@ -1,101 +1,30 @@
-// Mirrors backend/app/models/api.py and app/models/enums.py. Hand-written for
-// CP4's vertical slice; CP7 replaces this file with a client generated from
-// the OpenAPI schema and adds a CI check that fails on drift.
+// Generated from the backend's live OpenAPI schema (backend/openapi.json,
+// produced by backend/scripts/dump_openapi.py) via openapi-typescript into
+// ./generated/schema.d.ts. Both files are committed, and CI regenerates
+// them and diffs against what's committed - see .github/workflows/ci.yml's
+// "contract" job - so a change to a Pydantic model that isn't matched by a
+// regeneration fails the build (PRD 10.1's contract-drift check).
+//
+// These are just ergonomic aliases; nothing here is hand-typed against the
+// backend's shapes anymore; that job belongs entirely to the generator.
+import type { components } from "./generated/schema";
 
-export type TargetType = "domain" | "ip" | "cidr" | "organization";
+export type TargetType = components["schemas"]["TargetType"];
+export type JobStatus = components["schemas"]["JobStatus"];
+export type CollectorStatus = components["schemas"]["CollectorStatus"];
+export type Category = components["schemas"]["Category"];
+export type Confidence = components["schemas"]["Confidence"];
 
-export type JobStatus =
-  | "queued"
-  | "running"
-  | "completed"
-  | "completed_with_warnings"
-  | "failed"
-  | "canceled";
+export type CollectorRunRead = components["schemas"]["CollectorRunRead"];
+export type JobSummary = components["schemas"]["JobSummary"];
+export type JobDetail = components["schemas"]["JobDetail"];
+export type FindingRead = components["schemas"]["FindingRead"];
+export type SourceRead = components["schemas"]["SourceRead"];
+export type SubdomainRowRead = components["schemas"]["SubdomainRowRead"];
+export type JobCreateRequest = components["schemas"]["JobCreateRequest"];
 
-export type CollectorStatus =
-  | "queued"
-  | "running"
-  | "done"
-  | "failed"
-  | "skipped_no_key"
-  | "not_applicable"
-  | "interrupted";
-
-export type Category =
-  | "network_footprint"
-  | "technology_stack"
-  | "human_layer"
-  | "leaked_data";
-
-export type Confidence = "low" | "medium" | "high";
-
-export interface CollectorRunRead {
-  collector: string;
-  status: CollectorStatus;
-  attempt_count: number;
-  cache_hit: boolean;
-  finding_count: number;
-  safe_error_code: string | null;
-  safe_error_message: string | null;
-  started_at: string | null;
-  finished_at: string | null;
-}
-
-export interface JobSummary {
-  id: string;
-  target_input: string;
-  target_normalized: string;
-  target_type: TargetType;
-  status: JobStatus;
-  selected_sources: string[];
-  scope_note: string | null;
-  created_at: string;
-  started_at: string | null;
-  finished_at: string | null;
-}
-
-export interface JobDetail extends JobSummary {
-  attestation_text: string;
-  attestation_version: string;
-  attestation_time: string;
-  collector_runs: CollectorRunRead[];
-}
-
-export interface FindingRead {
-  id: string;
-  collector: string;
-  category: Category;
-  kind: string;
-  title: string;
-  summary: string;
-  normalized_value: Record<string, unknown>;
-  raw_evidence: Record<string, unknown>;
-  source_url: string;
-  provider_observed_at: string | null;
-  retrieved_at: string;
-  confidence: Confidence | null;
-  fingerprint: string;
-}
-
-export type SourceState = "ready" | "missing_key" | "unavailable" | "not_applicable";
-
-export interface SourceRead {
-  name: string;
-  display_name: string;
-  supported_targets: TargetType[];
-  categories: Category[];
-  release: "mvp" | "1.1";
-  state: SourceState;
-  key_help_url: string | null;
-}
-
-export interface JobCreateRequest {
-  target: string;
-  selected_sources: string[];
-  scope_note: string | null;
-  attestation_confirmed: boolean;
-}
-
+// Not part of the OpenAPI schema: a validation error body (FastAPI's
+// default exception handler shape) and the SSE message payload shape.
 export interface ApiErrorBody {
   detail: string;
 }

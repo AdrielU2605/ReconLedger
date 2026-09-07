@@ -30,12 +30,41 @@ header h1 {
   margin-bottom: 0.25rem;
 }
 
+.header-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.header-row button {
+  padding: 0.35rem 0.9rem;
+  font-size: 0.9rem;
+  background: #fff;
+  color: var(--accent);
+}
+
 .panel {
   border: 1px solid var(--border);
   background: var(--bg-panel);
   border-radius: 8px;
   padding: 1rem 1.25rem;
   margin-bottom: 1.25rem;
+}
+
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.dismiss-button {
+  padding: 0.3rem 0.75rem;
+  font-size: 0.85rem;
+  background: #fff;
+  color: var(--text);
+  border-color: var(--border);
 }
 
 label {

@@ -78,17 +78,6 @@ export function LaunchForm({ onLaunched }: LaunchFormProps) {
 
   return (
     <form onSubmit={handleSubmit} className="launch-form" aria-label="Launch a passive reconnaissance job">
-      <section className="panel" aria-labelledby="first-run-heading">
-        <h2 id="first-run-heading">Before you start</h2>
-        <p>
-          ReconLedger performs <strong>passive</strong> reconnaissance only: it queries public and
-          third-party data providers (registries, certificate transparency logs, DNS resolvers) and
-          never sends any request to the domain, IP, or CIDR block you enter. Examples of valid
-          input: <code>example.com</code>, <code>203.0.113.0/24</code>, or <code>Example Corp</code>{" "}
-          (organization search ships in a later release).
-        </p>
-      </section>
-
       <section className="panel">
         <label htmlFor="target-input">Target (domain, IP, or CIDR)</label>
         <input

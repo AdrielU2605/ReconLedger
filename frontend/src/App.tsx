@@ -3,6 +3,7 @@ import { api } from "./api/client";
 import type { JobDetail } from "./api/types";
 import { LaunchForm } from "./features/launch/LaunchForm";
 import { FindingsView } from "./features/findings/FindingsView";
+import { FirstRunExplainer } from "./features/help/FirstRunExplainer";
 import { ProgressView } from "./features/progress/ProgressView";
 import { useJob } from "./features/progress/useJob";
 
@@ -11,6 +12,7 @@ const TERMINAL_STATUSES = new Set(["completed", "completed_with_warnings", "fail
 export default function App() {
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
   const [cancelling, setCancelling] = useState(false);
+  const [helpForcedOpen, setHelpForcedOpen] = useState(false);
   const { job, connectionState, error } = useJob(activeJobId);
 
   async function handleCancel() {
@@ -34,9 +36,16 @@ export default function App() {
   return (
     <main>
       <header>
-        <h1>ReconLedger</h1>
+        <div className="header-row">
+          <h1>ReconLedger</h1>
+          <button type="button" onClick={() => setHelpForcedOpen(true)}>
+            Help
+          </button>
+        </div>
         <p>Passive reconnaissance, one authorized target at a time.</p>
       </header>
+
+      <FirstRunExplainer forceOpen={helpForcedOpen} onDismiss={() => setHelpForcedOpen(false)} />
 
       {!activeJobId && <LaunchForm onLaunched={handleLaunched} />}
 
