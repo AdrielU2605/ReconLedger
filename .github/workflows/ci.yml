@@ -30,4 +30,31 @@ jobs:
       - name: Pytest (process-wide socket block enforced; no live network calls)
         run: pytest
 
-  # A frontend job is added once frontend/package.json exists (CP4).
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: TypeScript strict type check
+        run: npm run typecheck
+
+      - name: ESLint
+        run: npm run lint
+
+      - name: Vitest (component tests; api client is mocked, no live network calls)
+        run: npm test
+
+      - name: Production build
+        run: npm run build
