@@ -33,6 +33,29 @@ class Settings(BaseSettings):
     app_version: str = "0.1.0"
     repository_url: str = "https://github.com/AdrielU2605/ReconLedger"
 
+    database_url: str = "sqlite+aiosqlite:///./reconledger.db"
+
+    # FR-01 / 9 Concurrency: default one job at a time, up to five collectors
+    # concurrently, configurable without code changes.
+    max_concurrent_jobs: int = 1
+    max_concurrent_collectors_per_job: int = 5
+
+    # FR-12: default retention window for jobs/findings.
+    retention_days: int = 90
+
+    # 9 Process model: the durable worker runs in-process. A second worker
+    # process claiming the same queue is refused at startup unless this is
+    # explicitly set (an external worker coordinator is out of MVP scope).
+    external_worker_configured: bool = False
+
+    # PRD 4.4: a single IP target in a private/reserved range is rejected
+    # unless this is set, so local development can target the developer's own
+    # machine. CIDR inputs are unaffected - 203.0.113.0/24 (the fixed
+    # verification target) is IANA-reserved documentation space by design.
+    allow_private_ip_targets_for_testing: bool = False
+
+    worker_lock_path: str = "reconledger.worker.lock"
+
     @model_validator(mode="after")
     def _validate_bind(self) -> "Settings":
         loopback_hosts = {"127.0.0.1", "::1", "localhost"}

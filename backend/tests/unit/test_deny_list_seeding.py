@@ -51,6 +51,19 @@ async def test_seed_deny_list_uses_the_gateway_itself_for_doh_resolution(setting
     assert doh_calls == ["dns.example/resolve?name=example.com"]
 
 
+def test_seed_networks_blocks_any_address_within_the_range() -> None:
+    """A CIDR target denies the whole range, not just one address, since a
+    provider could resolve to any host inside the block the user is
+    assessing."""
+    deny_list = TargetDenyList()
+    deny_list.seed_networks([ipaddress.ip_network("203.0.113.0/24")])
+
+    assert deny_list.seeded
+    assert deny_list.contains(ipaddress.ip_address("203.0.113.10"))
+    assert deny_list.contains(ipaddress.ip_address("203.0.113.255"))
+    assert not deny_list.contains(ipaddress.ip_address("203.0.114.1"))
+
+
 @pytest.mark.asyncio
 async def test_addresses_discovered_later_are_blocked_immediately(settings, public_resolver) -> None:
     deny_list = TargetDenyList()

@@ -34,7 +34,7 @@ from app.security.errors import (
     RedirectRejectedError,
     ResponseTooLargeError,
 )
-from app.security.network import IPAddress, Resolver, TargetDenyList, is_forbidden_address
+from app.security.network import IPAddress, Resolver, SystemResolver, TargetDenyList, is_forbidden_address
 from app.security.rate_limit import RetryPolicy, compute_backoff_seconds, parse_retry_after
 
 logger = logging.getLogger("reconledger.gateway")
@@ -243,3 +243,14 @@ class OutboundGateway:
 
     async def aclose(self) -> None:
         await self._client.aclose()
+
+
+def build_production_gateway(settings: Settings) -> OutboundGateway:
+    """One real gateway per job, using the real system resolver for provider
+    hosts and a real httpx transport. Never constructed by, or exposed to,
+    collectors directly - only the job runner builds these."""
+    return OutboundGateway(
+        transport=httpx.AsyncHTTPTransport(),
+        resolver=SystemResolver(),
+        settings=settings,
+    )

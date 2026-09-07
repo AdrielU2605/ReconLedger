@@ -87,17 +87,24 @@ class SystemResolver:
         return list(seen.values())
 
 
+IPNetwork = ipaddress.IPv4Network | ipaddress.IPv6Network
+
+
 @dataclass
 class TargetDenyList:
-    """The per-job set of addresses that must never be contacted.
+    """The per-job set of addresses (and, for a CIDR target, address ranges)
+    that must never be contacted.
 
-    FR-03: populated before any collector is claimed via a pre-job DoH resolution;
-    addresses discovered later in the job are added immediately. No collector runs
-    while this is unpopulated for the job.
+    FR-03: populated before any collector is claimed via a pre-job DoH
+    resolution for a domain target, or directly from the target itself for an
+    IP/CIDR target (no DNS lookup needed - the target already is an address).
+    Addresses discovered later in the job are added immediately. No collector
+    runs while this is unpopulated for the job.
     """
 
     _seeded: bool = False
     _addresses: set[str] = field(default_factory=set)
+    _networks: list[IPNetwork] = field(default_factory=list)
 
     @property
     def seeded(self) -> bool:
@@ -107,8 +114,14 @@ class TargetDenyList:
         self._addresses.update(str(a) for a in addresses)
         self._seeded = True
 
+    def seed_networks(self, networks: list[IPNetwork]) -> None:
+        self._networks.extend(networks)
+        self._seeded = True
+
     def add(self, addresses: list[IPAddress]) -> None:
         self._addresses.update(str(a) for a in addresses)
 
     def contains(self, address: IPAddress) -> bool:
-        return str(address) in self._addresses
+        if str(address) in self._addresses:
+            return True
+        return any(address in network for network in self._networks if address.version == network.version)
