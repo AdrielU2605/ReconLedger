@@ -1,6 +1,6 @@
-/// <reference types="vitest/config" />
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
+import { configDefaults } from "vitest/config";
 
 export default defineConfig({
   plugins: [react()],
@@ -22,6 +22,11 @@ export default defineConfig({
     environment: "jsdom",
     setupFiles: ["./src/test/setup.ts"],
     css: false,
+    // e2e/ holds Playwright specs (npm run test:e2e), not Vitest ones - both
+    // frameworks default to globbing *.spec.ts, so without this exclusion
+    // Vitest tries to load Playwright's test() and fails immediately.
+    // Extends (not replaces) Vitest's own default exclude list.
+    exclude: [...configDefaults.exclude, "e2e/**"],
     // Without this, a vi.fn() call count (or mockResolvedValue override)
     // from one test silently carries into the next test in the same file -
     // exactly the kind of cross-test pollution that produces flaky,
