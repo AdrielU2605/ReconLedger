@@ -3,6 +3,7 @@ here, never modifying orchestration logic in app/jobs/runner.py.
 """
 from __future__ import annotations
 
+from app.collectors import crtsh, dns_doh, rdap
 from app.collectors.base import Collector
 from app.models.enums import TargetType
 
@@ -38,9 +39,10 @@ class CollectorRegistry:
 
 def _register_real_collectors(registry: CollectorRegistry) -> None:
     """The single, explicit place real collectors are wired in. Nothing in
-    this function ever imports from the tests/ package. No MVP collector
-    exists yet - CP3 adds RDAP, DNS-over-HTTPS, and crt.sh here."""
-    return
+    this function ever imports from the tests/ package."""
+    registry.register(rdap)
+    registry.register(dns_doh)
+    registry.register(crtsh)
 
 
 _production_registry: CollectorRegistry | None = None

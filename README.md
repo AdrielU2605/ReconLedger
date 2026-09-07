@@ -15,11 +15,13 @@ checkpoint (definition of done). Until then:
 
 - **CP1:** repository bootstrap and the outbound safety gateway - the single policy-enforcing
   transport every future network call must go through.
-- **CP2 (this checkpoint):** persistence (SQLAlchemy + Alembic + FTS5), the job runner (claim,
-  dispatch, cancel, restart recovery), the collector plug-in contract and registry, server-side
-  target validation, the diff and export services, and the core REST + SSE API. No real
-  collector is registered yet (`GET /api/sources` returns an empty list) - CP3 adds RDAP,
-  DNS-over-HTTPS, and crt.sh.
+- **CP2:** persistence (SQLAlchemy + Alembic + FTS5), the job runner (claim, dispatch, cancel,
+  restart recovery), the collector plug-in contract and registry, server-side target validation,
+  the diff and export services, and the core REST + SSE API.
+- **CP3 (this checkpoint):** the first three MVP collectors - RDAP, DNS-over-HTTPS (with a
+  secondary resolver and resolver-disagreement evidence), and crt.sh Certificate Transparency -
+  plus the FR-05 response cache. `GET /api/sources` now lists all three as ready with no keys
+  required. CP4 adds the first frontend slice over these three collectors.
 
 ### Running it locally (developer preview - full instructions land at the final checkpoint)
 
