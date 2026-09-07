@@ -70,6 +70,16 @@ class FindingRead(BaseModel):
     fingerprint: str
 
 
+class SubdomainRowRead(BaseModel):
+    subdomain: str
+    source_count: int
+    sources: list[str]
+    first_seen_at: str | None
+    last_seen_at: str | None
+    wildcard: bool
+    in_scope: bool
+
+
 class SourceRead(BaseModel):
     name: str
     display_name: str

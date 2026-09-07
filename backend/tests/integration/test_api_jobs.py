@@ -135,6 +135,24 @@ def test_create_job_runs_to_completion_and_persists_findings(client: TestClient)
     assert findings.status_code == 200
     assert findings.json()[0]["kind"] == "echo.finding"
 
+    filtered = client.get(f"/api/jobs/{job['id']}/findings", params={"category": "human_layer"})
+    assert filtered.status_code == 200
+    assert filtered.json() == []  # the echo finding is network_footprint
+
+    searched = client.get(f"/api/jobs/{job['id']}/findings", params={"q": "Echo finding"})
+    assert searched.status_code == 200
+    assert searched.json()[0]["kind"] == "echo.finding"
+
+    no_match = client.get(f"/api/jobs/{job['id']}/findings", params={"q": "nothing-like-this"})
+    assert no_match.status_code == 200
+    assert no_match.json() == []
+
+    # The echo collector doesn't produce ct.subdomain-kind evidence, so the
+    # subdomain workspace should come back empty without erroring.
+    subdomains = client.get(f"/api/jobs/{job['id']}/subdomains")
+    assert subdomains.status_code == 200
+    assert subdomains.json() == []
+
 
 def test_findings_endpoint_404s_for_unknown_job(client: TestClient) -> None:
     resp = client.get("/api/jobs/does-not-exist/findings")

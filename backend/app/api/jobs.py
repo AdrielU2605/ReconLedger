@@ -14,10 +14,12 @@ from app.api.dependencies import get_registry, get_runner, get_session, get_sess
 from app.collectors.registry import CollectorRegistry
 from app.jobs.runner import JobRunner
 from app.jobs.service import JobCreationError, create_job
-from app.models.api import FindingRead, JobCreateRequest, JobDetail, JobSummary
+from app.models.api import FindingRead, JobCreateRequest, JobDetail, JobSummary, SubdomainRowRead
 from app.models.db import Finding, Job, JobEvent
-from app.models.enums import TERMINAL_JOB_STATUSES
+from app.models.enums import TERMINAL_JOB_STATUSES, Category
 from app.security.origins import enforce_local_origin_and_content_type
+from app.services.search import find_matching_finding_ids
+from app.services.subdomains import aggregate_subdomains
 
 router = APIRouter(tags=["jobs"], dependencies=[Depends(enforce_local_origin_and_content_type)])
 
@@ -54,16 +56,44 @@ async def get_job(job_id: str, session: AsyncSession = Depends(get_session)) -> 
 
 
 @router.get("/api/jobs/{job_id}/findings", response_model=list[FindingRead])
-async def list_findings(job_id: str, session: AsyncSession = Depends(get_session)) -> list[Finding]:
-    """Unfiltered listing for CP4's evidence view. Search and filtering
-    (UX-08) are added in CP5 once the FTS5 projection has a consumer."""
+async def list_findings(
+    job_id: str,
+    q: str | None = None,
+    category: Category | None = None,
+    collector: str | None = None,
+    session: AsyncSession = Depends(get_session),
+) -> list[Finding]:
+    """UX-08: global search (q, matched via the findings_fts FTS5 projection)
+    combined with category/source filters. Omitting all three params returns
+    every finding in the job (CP4's original unfiltered behavior)."""
     job = await session.get(Job, job_id)
     if job is None:
         raise HTTPException(status_code=404, detail=f"Job {job_id!r} does not exist.")
-    result = await session.execute(
-        select(Finding).where(Finding.job_id == job_id).order_by(Finding.category, Finding.retrieved_at)
-    )
+
+    query = select(Finding).where(Finding.job_id == job_id)
+    if q:
+        matched_ids = await find_matching_finding_ids(session, job_id=job_id, query=q)
+        if not matched_ids:
+            return []
+        query = query.where(Finding.id.in_(matched_ids))
+    if category is not None:
+        query = query.where(Finding.category == category)
+    if collector is not None:
+        query = query.where(Finding.collector == collector)
+
+    result = await session.execute(query.order_by(Finding.category, Finding.retrieved_at))
     return list(result.scalars().all())
+
+
+@router.get("/api/jobs/{job_id}/subdomains", response_model=list[SubdomainRowRead])
+async def list_subdomains(job_id: str, session: AsyncSession = Depends(get_session)) -> list[SubdomainRowRead]:
+    job = await session.get(Job, job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail=f"Job {job_id!r} does not exist.")
+    result = await session.execute(select(Finding).where(Finding.job_id == job_id))
+    findings = list(result.scalars().all())
+    rows = aggregate_subdomains(job.target_normalized, findings)
+    return [SubdomainRowRead(**row.__dict__) for row in rows]
 
 
 @router.post("/api/jobs/{job_id}/cancel")
