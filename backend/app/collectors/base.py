@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Protocol
 
+from app.collectors.job_findings import JobFindingsReader
 from app.models.enums import Category, Confidence, TargetType
 from app.security.gateway import OutboundGateway
 from app.security.targets import ClassifiedTarget
@@ -84,6 +85,7 @@ class CollectorContext:
     scope_note: str | None
     gateway: OutboundGateway
     cache: CacheAccess
+    job_findings: JobFindingsReader
     cancellation: asyncio.Event
     job_deadline_monotonic: float
     collector_budget_seconds: float

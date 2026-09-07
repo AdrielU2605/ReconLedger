@@ -3,7 +3,7 @@ here, never modifying orchestration logic in app/jobs/runner.py.
 """
 from __future__ import annotations
 
-from app.collectors import crtsh, dns_doh, rdap, ripestat
+from app.collectors import commoncrawl, crtsh, dns_doh, rdap, ripestat, technology, wayback
 from app.collectors.base import Collector
 from app.models.enums import TargetType
 
@@ -44,6 +44,9 @@ def _register_real_collectors(registry: CollectorRegistry) -> None:
     registry.register(dns_doh)
     registry.register(crtsh)
     registry.register(ripestat)
+    registry.register(wayback)
+    registry.register(commoncrawl)
+    registry.register(technology)
 
 
 _production_registry: CollectorRegistry | None = None

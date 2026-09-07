@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.collectors.base import CollectedFinding, CollectorContext
 from app.collectors.errors import CollectorError, TargetNotApplicableError, translate_gateway_error
+from app.collectors.job_findings import JobFindingsReader
 from app.collectors.registry import CollectorRegistry
 from app.config import Settings
 from app.db.base import utcnow
@@ -32,6 +33,14 @@ from app.services.cache import CacheAccess
 logger = logging.getLogger("reconledger.runner")
 
 GatewayFactory = Callable[[Settings], OutboundGateway]
+
+# Technology inference (FR-10) derives its findings from other collectors'
+# already-persisted evidence and makes no network call of its own, so it
+# always runs after every other selected collector for the job has reached
+# a terminal state - never concurrently with them, regardless of the
+# concurrency limit. This is the one collector name the runner treats
+# specially; everything else about the plug-in contract is unchanged.
+DEFERRED_UNTIL_LAST_COLLECTORS = frozenset({"technology"})
 
 
 def _compute_job_status(collector_statuses: list[CollectorStatus]) -> JobStatus:
@@ -186,8 +195,21 @@ class JobRunner:
                         cancellation=cancellation,
                     )
 
-            if pending:
-                await asyncio.gather(*(_bounded(cr_id, name) for cr_id, name in pending))
+            immediate = [(cr_id, name) for cr_id, name in pending if name not in DEFERRED_UNTIL_LAST_COLLECTORS]
+            deferred = [(cr_id, name) for cr_id, name in pending if name in DEFERRED_UNTIL_LAST_COLLECTORS]
+
+            if immediate:
+                await asyncio.gather(*(_bounded(cr_id, name) for cr_id, name in immediate))
+            for collector_run_id, collector_name in deferred:
+                await self._run_one_collector(
+                    job_id=job_id,
+                    collector_run_id=collector_run_id,
+                    collector_name=collector_name,
+                    target=target,
+                    scope_note=scope_note,
+                    gateway=gateway,
+                    cancellation=cancellation,
+                )
             await gateway.aclose()
             await self._finalize_job(job_id, cancellation)
         finally:
@@ -257,6 +279,7 @@ class JobRunner:
                 collector=collector_name,
                 schema_version=collector.metadata.cache_policy.schema_version,
             ),
+            job_findings=JobFindingsReader(session_factory=self._session_factory, job_id=job_id),
             cancellation=cancellation,
             job_deadline_monotonic=time.monotonic() + self._settings.job_budget_seconds,
             collector_budget_seconds=self._settings.collector_budget_seconds,

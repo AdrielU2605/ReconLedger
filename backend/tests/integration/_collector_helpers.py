@@ -9,6 +9,7 @@ from typing import Callable
 import httpx
 
 from app.collectors.base import CollectorContext
+from app.collectors.job_findings import JobFindingsReader
 from app.config import Settings
 from app.models.enums import TargetType
 from app.security.gateway import OutboundGateway
@@ -28,13 +29,14 @@ def make_gateway(handler: Callable[[httpx.Request], "asyncio.Future[httpx.Respon
     )
 
 
-def make_context(session_factory, gateway: OutboundGateway, *, target_type: TargetType, target_normalized: str, collector: str, schema_version: str = "1") -> CollectorContext:
+def make_context(session_factory, gateway: OutboundGateway, *, target_type: TargetType, target_normalized: str, collector: str, schema_version: str = "1", job_id: str = "job-1") -> CollectorContext:
     return CollectorContext(
-        job_id="job-1",
+        job_id=job_id,
         target=ClassifiedTarget(target_type=target_type, original_input=target_normalized, normalized=target_normalized),
         scope_note=None,
         gateway=gateway,
         cache=CacheAccess(session_factory=session_factory, collector=collector, schema_version=schema_version),
+        job_findings=JobFindingsReader(session_factory=session_factory, job_id=job_id),
         cancellation=asyncio.Event(),
         job_deadline_monotonic=time.monotonic() + 300,
         collector_budget_seconds=90,

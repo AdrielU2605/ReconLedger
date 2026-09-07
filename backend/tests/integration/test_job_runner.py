@@ -398,3 +398,62 @@ async def test_cidr_target_seeds_deny_list_without_any_gateway_call(session_fact
 
     job = await _get_job(session_factory, job_id)
     assert job.status == JobStatus.COMPLETED
+
+
+@pytest.mark.asyncio
+async def test_technology_collector_runs_after_all_others_and_sees_their_findings(session_factory) -> None:
+    """CP6: a collector named "technology" is dispatched only once every
+    other selected collector has reached a terminal state, and can read
+    their already-persisted findings via context.job_findings - proving
+    both the sequencing and the read-back actually work together, not just
+    in technology.py's own isolated unit tests."""
+    execution_order: list[str] = []
+
+    async def run_a(context: CollectorContext) -> list[CollectedFinding]:
+        execution_order.append("a-start")
+        await asyncio.sleep(0.01)
+        execution_order.append("a-end")
+        return [_finding(kind="a.finding")]
+
+    async def run_b(context: CollectorContext) -> list[CollectedFinding]:
+        execution_order.append("b-start")
+        execution_order.append("b-end")
+        return [_finding(kind="b.finding")]
+
+    seen_kinds_by_technology: list[str] = []
+
+    async def run_technology(context: CollectorContext) -> list[CollectedFinding]:
+        execution_order.append("technology-start")
+        sibling_findings = await context.job_findings.get()
+        seen_kinds_by_technology.extend(sorted(f.kind for f in sibling_findings))
+        return []
+
+    collector_a = ScriptedCollector("a", supported=frozenset({TargetType.IP}))
+    collector_a.on_run = run_a
+    collector_b = ScriptedCollector("b", supported=frozenset({TargetType.IP}))
+    collector_b.on_run = run_b
+    collector_tech = ScriptedCollector("technology", supported=frozenset({TargetType.IP}))
+    collector_tech.on_run = run_technology
+
+    registry = CollectorRegistry()
+    registry.register(collector_a, allow_test_only=True)
+    registry.register(collector_b, allow_test_only=True)
+    registry.register(collector_tech, allow_test_only=True)
+
+    # An IP target needs no gateway call at all to seed its deny-list (the
+    # address IS the target), unlike a domain target - matching the pattern
+    # test_cidr_target_seeds_deny_list_without_any_gateway_call already
+    # established for exactly this reason.
+    job_id = await _create_job(
+        session_factory, target_type=TargetType.IP, target_normalized=PUBLIC_TEST_IP,
+        collector_names=["a", "b", "technology"], status=JobStatus.RUNNING,
+    )
+    runner = _make_runner(session_factory, registry)
+    await runner.run_job(job_id)
+
+    assert execution_order.index("technology-start") > execution_order.index("a-end")
+    assert execution_order.index("technology-start") > execution_order.index("b-end")
+    assert seen_kinds_by_technology == ["a.finding", "b.finding"]
+
+    job = await _get_job(session_factory, job_id)
+    assert job.status == JobStatus.COMPLETED
