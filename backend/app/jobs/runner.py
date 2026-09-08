@@ -124,6 +124,13 @@ class JobRunner:
                     return None
         return job_id
 
+    def is_active(self, job_id: str) -> bool:
+        """True while run_job(job_id) is currently in flight for this job -
+        used to reject a collector retry request against a job that's
+        already being dispatched, rather than racing two concurrent
+        run_job() calls for the same job_id."""
+        return job_id in self._cancellation_events
+
     # -- cancellation ----------------------------------------------------
 
     async def request_cancellation(self, job_id: str) -> bool:

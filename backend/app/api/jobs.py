@@ -16,7 +16,7 @@ from app.jobs.runner import JobRunner
 from app.jobs.service import JobCreationError, create_job
 from app.models.api import FindingRead, JobCreateRequest, JobDetail, JobSummary, SubdomainRowRead
 from app.models.db import CollectorRun, Finding, Job, JobEvent
-from app.models.enums import TERMINAL_JOB_STATUSES, Category, CollectorStatus
+from app.models.enums import TERMINAL_JOB_STATUSES, Category, CollectorStatus, JobStatus
 from app.security.origins import enforce_local_origin_and_content_type
 from app.services.csv_export import build_subdomains_csv
 from app.services.search import find_matching_finding_ids
@@ -142,6 +142,48 @@ async def cancel_job(job_id: str, runner: JobRunner = Depends(get_runner)) -> di
             detail="Job does not exist, or is not in a cancellable (queued/running) state.",
         )
     return {"status": "cancellation_requested"}
+
+
+@router.post("/api/jobs/{job_id}/collectors/{collector_name}/retry")
+async def retry_collector(
+    job_id: str,
+    collector_name: str,
+    session: AsyncSession = Depends(get_session),
+    runner: JobRunner = Depends(get_runner),
+) -> dict[str, str]:
+    """PRD 7.4: retry a single failed collector without re-running the rest
+    of the job. Re-queues the collector run and the job itself - the
+    in-process worker loop (app.main._worker_loop) picks the job back up the
+    same way it picks up any newly-created one, so this needs no direct call
+    into the runner's dispatch path."""
+    job = await session.get(Job, job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail=f"Job {job_id!r} does not exist.")
+    if runner.is_active(job_id):
+        raise HTTPException(status_code=409, detail="Job is currently being dispatched; try again shortly.")
+
+    result = await session.execute(
+        select(CollectorRun).where(CollectorRun.job_id == job_id, CollectorRun.collector == collector_name)
+    )
+    run = result.scalar_one_or_none()
+    if run is None:
+        raise HTTPException(status_code=404, detail=f"No collector named {collector_name!r} in this job.")
+    if run.status != CollectorStatus.FAILED:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Collector {collector_name!r} is not in a retryable (failed) state.",
+        )
+
+    run.status = CollectorStatus.QUEUED
+    run.started_at = None
+    run.finished_at = None
+    run.safe_error_code = None
+    run.safe_error_message = None
+    job.status = JobStatus.QUEUED
+    job.started_at = None
+    job.finished_at = None
+    await session.commit()
+    return {"status": "retry_queued"}
 
 
 @router.delete("/api/jobs/{job_id}", status_code=204, response_model=None)

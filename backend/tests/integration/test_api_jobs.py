@@ -100,12 +100,52 @@ class _FailingCollector:
         raise RuntimeError("deliberately fails for warning_count coverage")
 
 
+class _FlakyCollector:
+    """Fails on its first attempt, succeeds on every attempt after that -
+    lets the retry-endpoint tests prove a retry actually re-dispatches the
+    collector rather than just flipping its stored status."""
+
+    def __init__(self) -> None:
+        self.metadata = CollectorMetadata(
+            name="flaky",
+            display_name="Flaky",
+            supported_targets=frozenset({TargetType.DOMAIN, TargetType.IP}),
+            categories=frozenset({Category.NETWORK_FOOTPRINT}),
+            required_credentials=(),
+            provider_hosts=frozenset(),
+            key_help_url=None,
+            rate_policy=RatePolicy(requests_per_period=1, period_seconds=1, burst=1, concurrency=1),
+            cache_policy=CachePolicy(positive_ttl_seconds=1, negative_ttl_seconds=1, schema_version="1"),
+            test_only=True,
+        )
+        self.calls = 0
+
+    async def run(self, context) -> list[CollectedFinding]:
+        self.calls += 1
+        if self.calls == 1:
+            raise RuntimeError("fails on the first attempt only")
+        return [
+            CollectedFinding(
+                category=Category.NETWORK_FOOTPRINT,
+                kind="flaky.finding",
+                title="Flaky finding",
+                summary="summary",
+                normalized_value={},
+                raw_evidence={},
+                source_url="https://provider.example/evidence",
+                retrieved_at=datetime.now(timezone.utc),
+                fingerprint="fp-flaky",
+            )
+        ]
+
+
 @pytest.fixture
 def client(db_url: str, tmp_path):
     settings = Settings(_env_file=None, database_url=db_url, worker_lock_path=str(tmp_path / "worker.lock"))
     registry = CollectorRegistry()
     registry.register(_EchoCollector(), allow_test_only=True)
     registry.register(_FailingCollector(), allow_test_only=True)
+    registry.register(_FlakyCollector(), allow_test_only=True)
     app = create_app(settings, registry=registry, gateway_factory=_fake_gateway_factory)
     with TestClient(app) as test_client:
         yield test_client
@@ -291,3 +331,48 @@ def test_list_jobs_reports_zero_warnings_for_a_clean_completion(client: TestClie
     listing = client.get("/api/jobs").json()
     summary = next(j for j in listing if j["id"] == job["id"])
     assert summary["warning_count"] == 0
+
+
+def test_retry_collector_404s_for_unknown_job(client: TestClient) -> None:
+    resp = client.post("/api/jobs/does-not-exist/collectors/echo/retry")
+    assert resp.status_code == 404
+
+
+def test_retry_collector_404s_for_unknown_collector_name(client: TestClient) -> None:
+    job = client.post(
+        "/api/jobs",
+        json={"target": "example.com", "selected_sources": ["echo"], "attestation_confirmed": True},
+    ).json()
+    job = _wait_for_terminal(client, job["id"])
+    resp = client.post(f"/api/jobs/{job['id']}/collectors/not-a-real-collector/retry")
+    assert resp.status_code == 404
+
+
+def test_retry_collector_409s_when_collector_did_not_fail(client: TestClient) -> None:
+    job = _wait_for_terminal(client, _launch(client)["id"])
+    assert job["collector_runs"][0]["status"] == "done"
+
+    resp = client.post(f"/api/jobs/{job['id']}/collectors/echo/retry")
+    assert resp.status_code == 409
+
+
+def test_retry_collector_re_dispatches_and_can_turn_a_failed_job_into_completed(client: TestClient) -> None:
+    created = client.post(
+        "/api/jobs",
+        json={"target": "example.com", "selected_sources": ["flaky"], "attestation_confirmed": True},
+    ).json()
+    job = _wait_for_terminal(client, created["id"])
+    assert job["status"] == "failed"
+    assert job["collector_runs"][0]["status"] == "failed"
+
+    retry_resp = client.post(f"/api/jobs/{job['id']}/collectors/flaky/retry")
+    assert retry_resp.status_code == 200
+    assert retry_resp.json() == {"status": "retry_queued"}
+
+    retried_job = _wait_for_terminal(client, job["id"])
+    assert retried_job["status"] == "completed"
+    assert retried_job["collector_runs"][0]["status"] == "done"
+    assert retried_job["collector_runs"][0]["finding_count"] == 1
+
+    findings = client.get(f"/api/jobs/{job['id']}/findings").json()
+    assert findings[0]["kind"] == "flaky.finding"

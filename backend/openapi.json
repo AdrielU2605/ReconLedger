@@ -923,6 +923,62 @@
         ]
       }
     },
+    "/api/jobs/{job_id}/collectors/{collector_name}/retry": {
+      "post": {
+        "description": "PRD 7.4: retry a single failed collector without re-running the rest\nof the job. Re-queues the collector run and the job itself - the\nin-process worker loop (app.main._worker_loop) picks the job back up the\nsame way it picks up any newly-created one, so this needs no direct call\ninto the runner's dispatch path.",
+        "operationId": "retry_collector_api_jobs__job_id__collectors__collector_name__retry_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "collector_name",
+            "required": true,
+            "schema": {
+              "title": "Collector Name",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Retry Collector Api Jobs  Job Id  Collectors  Collector Name  Retry Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Retry Collector",
+        "tags": [
+          "jobs"
+        ]
+      }
+    },
     "/api/jobs/{job_id}/diff": {
       "get": {
         "operationId": "diff_job_api_jobs__job_id__diff_get",

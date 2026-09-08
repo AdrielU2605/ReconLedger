@@ -381,6 +381,37 @@ async def test_restart_recovery_resumes_an_interrupted_collector(session_factory
 
 
 @pytest.mark.asyncio
+async def test_is_active_true_only_while_run_job_in_flight(session_factory) -> None:
+    started = asyncio.Event()
+    release = asyncio.Event()
+
+    async def _slow(ctx):
+        started.set()
+        await release.wait()
+        return []
+
+    slow = ScriptedCollector("slow")
+    slow.on_run = _slow
+    registry = CollectorRegistry()
+    registry.register(slow, allow_test_only=True)
+
+    job_id = await _create_job(
+        session_factory, target_type=TargetType.IP, target_normalized=PUBLIC_TEST_IP,
+        collector_names=["slow"], status=JobStatus.RUNNING,
+    )
+    runner = _make_runner(session_factory, registry)
+    assert not runner.is_active(job_id)
+
+    run_task = asyncio.create_task(runner.run_job(job_id))
+    await started.wait()
+    assert runner.is_active(job_id)
+
+    release.set()
+    await run_task
+    assert not runner.is_active(job_id)
+
+
+@pytest.mark.asyncio
 async def test_cidr_target_seeds_deny_list_without_any_gateway_call(session_factory) -> None:
     """CIDR/IP deny-list seeding is pure local ipaddress parsing - proves the
     fake gateway's never_called_transport is genuinely never invoked."""

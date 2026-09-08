@@ -18,8 +18,9 @@ export default function App() {
   const [view, setView] = useState<View>("launch");
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
   const [cancelling, setCancelling] = useState(false);
+  const [retryingCollector, setRetryingCollector] = useState<string | null>(null);
   const [helpForcedOpen, setHelpForcedOpen] = useState(false);
-  const { job, connectionState, error } = useJob(activeJobId);
+  const { job, connectionState, error, reconnect } = useJob(activeJobId);
 
   async function handleCancel() {
     if (!activeJobId) return;
@@ -28,6 +29,17 @@ export default function App() {
       await api.cancelJob(activeJobId);
     } finally {
       setCancelling(false);
+    }
+  }
+
+  async function handleRetryCollector(collectorName: string) {
+    if (!activeJobId) return;
+    setRetryingCollector(collectorName);
+    try {
+      await api.retryCollector(activeJobId, collectorName);
+      reconnect();
+    } finally {
+      setRetryingCollector(null);
     }
   }
 
@@ -87,6 +99,8 @@ export default function App() {
             connectionState={connectionState}
             onCancel={handleCancel}
             cancelling={cancelling}
+            onRetryCollector={handleRetryCollector}
+            retryingCollector={retryingCollector}
           />
           {TERMINAL_STATUSES.has(job.status) && (
             <>

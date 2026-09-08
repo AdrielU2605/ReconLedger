@@ -63,6 +63,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/jobs/{job_id}/collectors/{collector_name}/retry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Retry Collector
+         * @description PRD 7.4: retry a single failed collector without re-running the rest
+         *     of the job. Re-queues the collector run and the job itself - the
+         *     in-process worker loop (app.main._worker_loop) picks the job back up the
+         *     same way it picks up any newly-created one, so this needs no direct call
+         *     into the runner's dispatch path.
+         */
+        post: operations["retry_collector_api_jobs__job_id__collectors__collector_name__retry_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/jobs/{job_id}/diff": {
         parameters: {
             query?: never;
@@ -587,6 +611,40 @@ export interface operations {
             header?: never;
             path: {
                 job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    retry_collector_api_jobs__job_id__collectors__collector_name__retry_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+                collector_name: string;
             };
             cookie?: never;
         };

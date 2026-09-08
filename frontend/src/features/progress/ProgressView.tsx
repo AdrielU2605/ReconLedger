@@ -6,6 +6,8 @@ interface ProgressViewProps {
   connectionState: ConnectionState;
   onCancel: () => void;
   cancelling: boolean;
+  onRetryCollector: (collectorName: string) => void;
+  retryingCollector: string | null;
 }
 
 const STATUS_LABELS: Record<string, string> = {
@@ -18,7 +20,14 @@ const STATUS_LABELS: Record<string, string> = {
   interrupted: "Interrupted (resuming)",
 };
 
-export function ProgressView({ job, connectionState, onCancel, cancelling }: ProgressViewProps) {
+export function ProgressView({
+  job,
+  connectionState,
+  onCancel,
+  cancelling,
+  onRetryCollector,
+  retryingCollector,
+}: ProgressViewProps) {
   const isTerminal = ["completed", "completed_with_warnings", "failed", "canceled"].includes(job.status);
 
   return (
@@ -44,6 +53,7 @@ export function ProgressView({ job, connectionState, onCancel, cancelling }: Pro
             <th scope="col">State</th>
             <th scope="col">Findings</th>
             <th scope="col">Reason</th>
+            <th scope="col">Action</th>
           </tr>
         </thead>
         <tbody>
@@ -56,6 +66,17 @@ export function ProgressView({ job, connectionState, onCancel, cancelling }: Pro
               </td>
               <td>{run.finding_count}</td>
               <td>{run.safe_error_message ?? "—"}</td>
+              <td>
+                {isTerminal && run.status === "failed" && (
+                  <button
+                    type="button"
+                    onClick={() => onRetryCollector(run.collector)}
+                    disabled={retryingCollector === run.collector}
+                  >
+                    {retryingCollector === run.collector ? "Retrying…" : "Retry"}
+                  </button>
+                )}
+              </td>
             </tr>
           ))}
         </tbody>

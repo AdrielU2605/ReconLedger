@@ -81,6 +81,9 @@ export const api = {
   cancelJob: (jobId: string): Promise<{ status: string }> =>
     request(`/api/jobs/${jobId}/cancel`, { method: "POST" }),
 
+  retryCollector: (jobId: string, collectorName: string): Promise<{ status: string }> =>
+    request(`/api/jobs/${jobId}/collectors/${encodeURIComponent(collectorName)}/retry`, { method: "POST" }),
+
   deleteJob: (jobId: string): Promise<void> => request(`/api/jobs/${jobId}`, { method: "DELETE" }),
 
   exportUrl: (jobId: string, format: "md" | "json", mode: "summary" | "full" = "full"): string =>

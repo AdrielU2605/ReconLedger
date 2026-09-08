@@ -17,6 +17,10 @@ export interface UseJobResult {
   job: JobDetail | null;
   connectionState: ConnectionState;
   error: string | null;
+  /** Re-opens the SSE connection for the same job id - needed after a
+   * collector retry, since the previous connection already closed itself
+   * on reaching a terminal state and won't reopen on its own. */
+  reconnect: () => void;
 }
 
 /**
@@ -29,6 +33,7 @@ export function useJob(jobId: string | null): UseJobResult {
   const [job, setJob] = useState<JobDetail | null>(null);
   const [connectionState, setConnectionState] = useState<ConnectionState>("connecting");
   const [error, setError] = useState<string | null>(null);
+  const [generation, setGeneration] = useState(0);
   const pollHandle = useRef<number | null>(null);
 
   useEffect(() => {
@@ -96,7 +101,7 @@ export function useJob(jobId: string | null): UseJobResult {
       source.close();
       stopPolling();
     };
-  }, [jobId]);
+  }, [jobId, generation]);
 
-  return { job, connectionState, error };
+  return { job, connectionState, error, reconnect: () => setGeneration((g) => g + 1) };
 }
