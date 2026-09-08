@@ -30,7 +30,7 @@ and controls - not bolted onto a passive OSINT tool.
 See [docs/PRD.md](docs/PRD.md) for the full requirements, safety boundary, and architecture this
 was built against.
 
-## What it does
+## What It Does
 
 Enter a domain, IP address, or CIDR block you're authorized to assess, pick which sources to
 query, and ReconLedger:
@@ -90,7 +90,7 @@ explained as not yet assessable, rather than rejected as invalid input.
   than blocking everything else.
 - **No email, personnel, or breach data is collected in this release** - see the point above.
 
-## Running it locally
+## How to Install
 
 Requires **Python 3.11+** and **Node.js 20+**. No other global dependency, database server, or
 account is needed - SQLite ships with Python, and every MVP source works without a key.
@@ -112,13 +112,32 @@ npm install
 npm run dev                       # http://localhost:5173
 ```
 
-Open http://localhost:5173, enter an authorized target (`example.com` and `203.0.113.0/24` always
-work - they're IANA-reserved documentation space with real, public registry data), confirm the
-authorization statement, pick your sources, and launch.
-
 Everything is local: the SQLite database lands next to wherever the backend was started (override
 with `RECONLEDGER_DATABASE_URL`; see [backend/.env.example](backend/.env.example) for every
 setting and its default).
+
+## Step-by-Step Instructions
+
+With both servers running (above), using the app looks like this:
+
+1. Open **http://localhost:5173** in a browser. The first-run panel explains the passive-only
+   boundary; dismiss it or reopen it later from **Help**.
+2. Enter an authorized target in the **Target** field - `example.com` and `203.0.113.0/24` always
+   work for a test run, since they're IANA-reserved documentation space with real, public registry
+   data behind them.
+3. Under **Sources**, leave every MVP source checked (or narrow it down) - each shows its live
+   readiness and needs no API key.
+4. Check the **authorization attestation** checkbox. This is required; the button stays disabled
+   without it.
+5. Click **Launch job**. Progress streams in live, per source, with no indefinite spinner - a
+   failed source shows its reason and the job still completes with whatever succeeded.
+6. Once finished, review **Evidence** below: findings grouped by category, each with its source,
+   retrieval time, and an expandable **Raw evidence** disclosure.
+7. Use the **Subdomains** table to filter, copy, or download the aggregated list as CSV, and the
+   evidence search box to find a specific nameserver, URL parameter, or ASN.
+8. Download the **Markdown** or **JSON** export for a shareable report.
+9. Open **History** to revisit or delete past jobs, or run the same target again to see cached
+   sources complete instantly and use **Compare with an earlier run** for an evidence-aware diff.
 
 ## History, diff, and theme
 
@@ -164,7 +183,7 @@ a production frontend build, and a contract check that regenerates the OpenAPI s
 generated TypeScript client and fails if the committed copies have drifted - all without any live
 network access.
 
-## Architecture
+## How It Works
 
 - **Outbound gateway** (`backend/app/security/gateway.py`) - the single object allowed to make a
   network call. Pins every connection to its resolved IP before the request is sent, validates
