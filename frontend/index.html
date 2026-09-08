@@ -8,6 +8,21 @@
     <link rel="icon" href="data:," />
     <meta name="referrer" content="no-referrer" />
     <title>ReconLedger</title>
+    <!-- UX-11: applied before first paint so an explicit theme choice from a
+         prior visit doesn't flash the wrong theme while React hydrates. -->
+    <script>
+      (function () {
+        try {
+          var stored = localStorage.getItem("reconledger-theme");
+          if (stored === "light" || stored === "dark") {
+            document.documentElement.setAttribute("data-theme", stored);
+          }
+        } catch (e) {
+          // localStorage unavailable (private browsing, blocked) - falls
+          // back to the OS-level prefers-color-scheme via CSS alone.
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

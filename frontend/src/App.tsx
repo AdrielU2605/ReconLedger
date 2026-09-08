@@ -6,9 +6,11 @@ import { DiffView } from "./features/diff/DiffView";
 import { FindingsView } from "./features/findings/FindingsView";
 import { FirstRunExplainer } from "./features/help/FirstRunExplainer";
 import { HistoryView } from "./features/history/HistoryView";
+import { useOnlineStatus } from "./features/offline/useOnlineStatus";
 import { ProgressView } from "./features/progress/ProgressView";
 import { SubdomainWorkspace } from "./features/subdomains/SubdomainWorkspace";
 import { useJob } from "./features/progress/useJob";
+import { useTheme } from "./theme";
 
 const TERMINAL_STATUSES = new Set(["completed", "completed_with_warnings", "failed", "canceled"]);
 
@@ -21,6 +23,8 @@ export default function App() {
   const [retryingCollector, setRetryingCollector] = useState<string | null>(null);
   const [helpForcedOpen, setHelpForcedOpen] = useState(false);
   const { job, connectionState, error, reconnect } = useJob(activeJobId);
+  const { theme, setTheme } = useTheme();
+  const online = useOnlineStatus();
 
   async function handleCancel() {
     if (!activeJobId) return;
@@ -79,10 +83,25 @@ export default function App() {
             <button type="button" onClick={() => setHelpForcedOpen(true)}>
               Help
             </button>
+            <label className="theme-select">
+              <span className="visually-hidden">Theme</span>
+              <select value={theme} onChange={(e) => setTheme(e.target.value as typeof theme)}>
+                <option value="system">Theme: System</option>
+                <option value="light">Theme: Light</option>
+                <option value="dark">Theme: Dark</option>
+              </select>
+            </label>
           </nav>
         </div>
         <p>Passive reconnaissance, one authorized target at a time.</p>
       </header>
+
+      {!online && (
+        <p role="alert" className="offline-banner">
+          You're offline. Recon Ledger only reaches its own local backend, but that request still
+          needs your network - reconnect to keep using it.
+        </p>
+      )}
 
       <FirstRunExplainer forceOpen={helpForcedOpen} onDismiss={() => setHelpForcedOpen(false)} />
 
