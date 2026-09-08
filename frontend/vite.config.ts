@@ -26,7 +26,7 @@ export default defineConfig({
     // frameworks default to globbing *.spec.ts, so without this exclusion
     // Vitest tries to load Playwright's test() and fails immediately.
     // Extends (not replaces) Vitest's own default exclude list.
-    exclude: [...configDefaults.exclude, "e2e/**"],
+    exclude: [...configDefaults.exclude, "e2e/**", "e2e-mocked/**"],
     // Without this, a vi.fn() call count (or mockResolvedValue override)
     // from one test silently carries into the next test in the same file -
     // exactly the kind of cross-test pollution that produces flaky,

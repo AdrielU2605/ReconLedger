@@ -11,7 +11,8 @@
     "typecheck": "tsc -b --noEmit",
     "lint": "eslint .",
     "generate-api-types": "openapi-typescript ../backend/openapi.json -o src/api/generated/schema.d.ts",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "test:e2e:mocked": "playwright test --config=playwright.mocked.config.ts"
   },
   "dependencies": {
     "react": "^18.3.1",

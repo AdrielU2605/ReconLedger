@@ -59,6 +59,43 @@ jobs:
       - name: Production build
         run: npm run build
 
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install backend package with dev dependencies
+        working-directory: backend
+        run: pip install -e ".[dev]"
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Install Playwright's Chromium browser
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+
+      # PRD 10.1's happy-path/partial-failure/cached-rerun/diff/history/
+      # keyboard/theme/downloads suite, against a scripted (mocked)
+      # OutboundGateway (backend/scripts/run_e2e_server_mocked.py) so it's
+      # fully hermetic. The real-network UX-12 client-isolation check
+      # (e2e/) stays out of CI on purpose - it needs genuine provider
+      # traffic, which CI must never make.
+      - name: Playwright e2e suite (mocked gateway; no live network calls)
+        working-directory: frontend
+        run: npm run test:e2e:mocked
+
   contract:
     runs-on: ubuntu-latest
     steps:
