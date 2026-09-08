@@ -28,7 +28,10 @@ class CorrelationJsonFormatter(logging.Formatter):
             "collector": collector_var.get(),
             "request_id": request_id_var.get(),
         }
-        for key in ("latency_ms", "attempt", "cache_outcome", "safe_error_code", "host"):
+        for key in (
+            "latency_ms", "attempt", "cache_outcome", "safe_error_code", "host",
+            "jobs_deleted", "cache_entries_deleted", "retention_days",
+        ):
             if hasattr(record, key):
                 payload[key] = getattr(record, key)
         if record.exc_info:

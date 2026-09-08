@@ -115,3 +115,15 @@ class DiffResponse(BaseModel):
     changed: list[DiffChangedPair]
     unchanged_count: int
     indeterminate: list[DiffFindingRead]
+
+
+class CacheCollectorSummary(BaseModel):
+    collector: str
+    count: int
+
+
+class CacheInventoryRead(BaseModel):
+    total_entries: int
+    expired_entries: int
+    size_bytes: int
+    by_collector: list[CacheCollectorSummary]

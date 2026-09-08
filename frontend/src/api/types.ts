@@ -25,6 +25,8 @@ export type JobCreateRequest = components["schemas"]["JobCreateRequest"];
 export type DiffFindingRead = components["schemas"]["DiffFindingRead"];
 export type DiffChangedPair = components["schemas"]["DiffChangedPair"];
 export type DiffResponse = components["schemas"]["DiffResponse"];
+export type CacheCollectorSummary = components["schemas"]["CacheCollectorSummary"];
+export type CacheInventoryRead = components["schemas"]["CacheInventoryRead"];
 
 // Not part of the OpenAPI schema: a validation error body (FastAPI's
 // default exception handler shape) and the SSE message payload shape.

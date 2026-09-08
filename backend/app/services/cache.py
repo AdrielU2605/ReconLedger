@@ -12,9 +12,11 @@ from dataclasses import dataclass
 from datetime import timedelta
 from typing import Any
 
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.db.base import utcnow
+from app.models.api import CacheCollectorSummary, CacheInventoryRead
 from app.models.db import CacheEntry
 
 CACHE_STATUS_SUCCESS = "success"
@@ -77,3 +79,42 @@ class CacheAccess:
                         last_modified=last_modified,
                     )
                 )
+
+
+async def inventory(session: AsyncSession) -> CacheInventoryRead:
+    """PRD 7.4: GET /api/cache - what a Clear cache action would remove,
+    shown before the user confirms it."""
+    now = utcnow()
+    total = (await session.execute(select(func.count()).select_from(CacheEntry))).scalar_one()
+    expired = (
+        await session.execute(select(func.count()).select_from(CacheEntry).where(CacheEntry.expires_at <= now))
+    ).scalar_one()
+    size_bytes = (
+        await session.execute(
+            select(
+                func.coalesce(
+                    func.sum(func.length(CacheEntry.response_json) + func.length(CacheEntry.normalized_findings_json)),
+                    0,
+                )
+            )
+        )
+    ).scalar_one()
+    by_collector_rows = await session.execute(
+        select(CacheEntry.collector, func.count()).group_by(CacheEntry.collector).order_by(CacheEntry.collector)
+    )
+    return CacheInventoryRead(
+        total_entries=total,
+        expired_entries=expired,
+        size_bytes=size_bytes,
+        by_collector=[CacheCollectorSummary(collector=collector, count=count) for collector, count in by_collector_rows.all()],
+    )
+
+
+async def purge_all(session: AsyncSession) -> None:
+    """PRD 7.4: DELETE /api/cache - a manual, explicit full purge. Distinct
+    from the automatic retention sweep, which only removes entries once
+    they've already expired. `session` is the per-request session from
+    get_session, which auto-begins its transaction on first use, so this
+    commits that same transaction rather than opening a second one."""
+    await session.execute(delete(CacheEntry))
+    await session.commit()

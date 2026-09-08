@@ -1,6 +1,55 @@
 {
   "components": {
     "schemas": {
+      "CacheCollectorSummary": {
+        "properties": {
+          "collector": {
+            "title": "Collector",
+            "type": "string"
+          },
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "collector",
+          "count"
+        ],
+        "title": "CacheCollectorSummary",
+        "type": "object"
+      },
+      "CacheInventoryRead": {
+        "properties": {
+          "by_collector": {
+            "items": {
+              "$ref": "#/components/schemas/CacheCollectorSummary"
+            },
+            "title": "By Collector",
+            "type": "array"
+          },
+          "expired_entries": {
+            "title": "Expired Entries",
+            "type": "integer"
+          },
+          "size_bytes": {
+            "title": "Size Bytes",
+            "type": "integer"
+          },
+          "total_entries": {
+            "title": "Total Entries",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "total_entries",
+          "expired_entries",
+          "size_bytes",
+          "by_collector"
+        ],
+        "title": "CacheInventoryRead",
+        "type": "object"
+      },
       "Category": {
         "enum": [
           "network_footprint",
@@ -737,6 +786,39 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/api/cache": {
+      "delete": {
+        "operationId": "delete_cache_api_cache_delete",
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Delete Cache",
+        "tags": [
+          "cache"
+        ]
+      },
+      "get": {
+        "operationId": "get_cache_inventory_api_cache_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CacheInventoryRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Cache Inventory",
+        "tags": [
+          "cache"
+        ]
+      }
+    },
     "/api/jobs": {
       "get": {
         "description": "UX-09 history: target, type, status, time, selected sources, and a\nwarning count (failed collector runs) - the last one computed here via\nan aggregate join rather than loading every job's full collector_runs\nlist, which is what makes JobDetail heavier than JobSummary.",

@@ -29,6 +29,7 @@ from app.security.errors import GatewayError
 from app.security.gateway import OutboundGateway, build_production_gateway
 from app.security.targets import ClassifiedTarget
 from app.services.cache import CacheAccess
+from app.services.retention import sweep as sweep_retention
 
 logger = logging.getLogger("reconledger.runner")
 
@@ -147,9 +148,14 @@ class JobRunner:
                     job.status = JobStatus.CANCELED
                     job.finished_at = utcnow()
                     await events.emit(session, job_id=job_id, event_type="job_finished", payload={"status": "canceled"})
-                    return True
-                if job.status != JobStatus.RUNNING:
+                    just_canceled = True
+                elif job.status != JobStatus.RUNNING:
                     return False
+                else:
+                    just_canceled = False
+        if just_canceled:
+            await sweep_retention(self._session_factory, retention_days=self._settings.retention_days)
+            return True
         cancellation = self._cancellation_events.get(job_id)
         if cancellation is None:
             return False
@@ -240,6 +246,7 @@ class JobRunner:
                     update(Job).where(Job.id == job_id).values(status=JobStatus.FAILED, finished_at=utcnow())
                 )
                 await events.emit(session, job_id=job_id, event_type="job_finished", payload={"status": "failed"})
+        await sweep_retention(self._session_factory, retention_days=self._settings.retention_days)
 
     async def _run_one_collector(
         self,
@@ -372,3 +379,4 @@ class JobRunner:
                     update(Job).where(Job.id == job_id).values(status=final_status, finished_at=utcnow())
                 )
                 await events.emit(session, job_id=job_id, event_type="job_finished", payload={"status": final_status.value})
+        await sweep_retention(self._session_factory, retention_days=self._settings.retention_days)

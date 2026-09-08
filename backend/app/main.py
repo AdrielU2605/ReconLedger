@@ -16,6 +16,7 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.api import cache as cache_api
 from app.api import diffs as diffs_api
 from app.api import exports as exports_api
 from app.api import jobs as jobs_api
@@ -28,6 +29,7 @@ from app.jobs.worker_lock import WorkerLock
 from app.logging_config import configure_logging
 from app.security.gateway import build_production_gateway
 from app.security.origins import ALLOWED_FRONTEND_ORIGINS
+from app.services import retention
 
 logger = logging.getLogger("reconledger.main")
 
@@ -72,6 +74,7 @@ def create_app(
         lock.acquire(external_worker_configured=settings.external_worker_configured)
 
         await runner.recover_on_startup()
+        await retention.sweep(session_factory, retention_days=settings.retention_days)
         resumable_job_ids = await runner.find_resumable_job_ids()
 
         app.state.engine = engine
@@ -109,6 +112,7 @@ def create_app(
     app.include_router(jobs_api.router)
     app.include_router(exports_api.router)
     app.include_router(diffs_api.router)
+    app.include_router(cache_api.router)
 
     @app.get("/health")
     async def health() -> dict[str, str]:

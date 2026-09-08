@@ -4,6 +4,24 @@
  */
 
 export interface paths {
+    "/api/cache": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Cache Inventory */
+        get: operations["get_cache_inventory_api_cache_get"];
+        put?: never;
+        post?: never;
+        /** Delete Cache */
+        delete: operations["delete_cache_api_cache_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/jobs": {
         parameters: {
             query?: never;
@@ -241,6 +259,24 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** CacheCollectorSummary */
+        CacheCollectorSummary: {
+            /** Collector */
+            collector: string;
+            /** Count */
+            count: number;
+        };
+        /** CacheInventoryRead */
+        CacheInventoryRead: {
+            /** By Collector */
+            by_collector: components["schemas"]["CacheCollectorSummary"][];
+            /** Expired Entries */
+            expired_entries: number;
+            /** Size Bytes */
+            size_bytes: number;
+            /** Total Entries */
+            total_entries: number;
+        };
         /**
          * Category
          * @enum {string}
@@ -492,6 +528,44 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    get_cache_inventory_api_cache_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CacheInventoryRead"];
+                };
+            };
+        };
+    };
+    delete_cache_api_cache_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     list_jobs_api_jobs_get: {
         parameters: {
             query?: never;

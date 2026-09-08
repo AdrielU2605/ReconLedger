@@ -1,5 +1,6 @@
 import type {
   ApiErrorBody,
+  CacheInventoryRead,
   Category,
   DiffResponse,
   FindingRead,
@@ -90,4 +91,8 @@ export const api = {
     `/api/jobs/${jobId}/export?format=${format}&mode=${mode}`,
 
   eventsUrl: (jobId: string): string => `/api/jobs/${jobId}/events`,
+
+  getCacheInventory: (): Promise<CacheInventoryRead> => request("/api/cache"),
+
+  clearCache: (): Promise<void> => request("/api/cache", { method: "DELETE" }),
 };

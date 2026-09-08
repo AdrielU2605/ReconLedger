@@ -2,6 +2,7 @@ import { useState } from "react";
 import { api } from "./api/client";
 import type { JobDetail } from "./api/types";
 import { LaunchForm } from "./features/launch/LaunchForm";
+import { CacheManager } from "./features/cache/CacheManager";
 import { DiffView } from "./features/diff/DiffView";
 import { FindingsView } from "./features/findings/FindingsView";
 import { FirstRunExplainer } from "./features/help/FirstRunExplainer";
@@ -22,6 +23,7 @@ export default function App() {
   const [cancelling, setCancelling] = useState(false);
   const [retryingCollector, setRetryingCollector] = useState<string | null>(null);
   const [helpForcedOpen, setHelpForcedOpen] = useState(false);
+  const [cacheManagerOpen, setCacheManagerOpen] = useState(false);
   const { job, connectionState, error, reconnect } = useJob(activeJobId);
   const { theme, setTheme } = useTheme();
   const online = useOnlineStatus();
@@ -83,6 +85,9 @@ export default function App() {
             <button type="button" onClick={() => setHelpForcedOpen(true)}>
               Help
             </button>
+            <button type="button" onClick={() => setCacheManagerOpen(true)}>
+              Cache
+            </button>
             <label className="theme-select">
               <span className="visually-hidden">Theme</span>
               <select value={theme} onChange={(e) => setTheme(e.target.value as typeof theme)}>
@@ -104,6 +109,8 @@ export default function App() {
       )}
 
       <FirstRunExplainer forceOpen={helpForcedOpen} onDismiss={() => setHelpForcedOpen(false)} />
+
+      <CacheManager open={cacheManagerOpen} onClose={() => setCacheManagerOpen(false)} />
 
       {view === "history" && !activeJobId && <HistoryView onReopen={handleReopen} />}
 
