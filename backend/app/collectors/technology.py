@@ -167,11 +167,16 @@ async def run(context: CollectorContext) -> list[CollectedFinding]:
                 kind="tech.inference",
                 title=technology,
                 summary=detection.explanation,
+                # supporting_finding_ids deliberately lives only in raw_evidence, not
+                # normalized_value: those IDs are this run's own Finding row UUIDs, always
+                # different from run to run even when the inference itself is identical,
+                # and the diff engine (app/services/diff.py) compares normalized_value for
+                # equality - including them there would make every technology finding show
+                # as "changed" on every rerun, never "unchanged".
                 normalized_value={
                     "rule_id": rule_id,
                     "technology": technology,
                     "confidence": detection.confidence.value,
-                    "supporting_finding_ids": sorted(detection.supporting_ids),
                 },
                 raw_evidence={"supporting_finding_ids": sorted(detection.supporting_ids)},
                 source_url=detection.source_url,

@@ -133,7 +133,10 @@ async def test_same_technology_from_two_samples_merges_into_one_finding_with_bot
     findings = await technology.run(context)
     cloudflare = [f for f in findings if f.title == "Cloudflare"]
     assert len(cloudflare) == 1
-    assert len(cloudflare[0].normalized_value["supporting_finding_ids"]) == 2
+    # Lives in raw_evidence, not normalized_value - see the comment in technology.py's
+    # run() for why: normalized_value must stay stable across runs for the diff engine.
+    assert len(cloudflare[0].raw_evidence["supporting_finding_ids"]) == 2
+    assert "supporting_finding_ids" not in cloudflare[0].normalized_value
 
 
 @pytest.mark.asyncio
@@ -157,3 +160,34 @@ async def test_unrelated_finding_kinds_are_ignored(session_factory) -> None:
     context = make_context(session_factory, _never_called_gateway(), target_type=TargetType.DOMAIN, target_normalized="example.com", collector="technology", job_id=job_id)
 
     assert await technology.run(context) == []
+
+
+@pytest.mark.asyncio
+async def test_identical_evidence_across_two_runs_produces_equal_normalized_value(session_factory) -> None:
+    """The diff engine (app/services/diff.py) calls two findings with the
+    same fingerprint 'unchanged' only when their normalized_value dicts are
+    equal. Each run's sibling findings get fresh Finding row UUIDs even when
+    the underlying evidence is byte-identical, so normalized_value must not
+    depend on those UUIDs - only raw_evidence may."""
+    job_a = await _make_job(session_factory)
+    await _seed_finding(
+        session_factory, job_a, kind="dns.ns", fingerprint="fp-ns-a", collector="dns_doh",
+        normalized_value_json={"nameservers": ["ns1.cloudflare.com"]},
+    )
+    context_a = make_context(session_factory, _never_called_gateway(), target_type=TargetType.DOMAIN, target_normalized="example.com", collector="technology", job_id=job_a)
+    findings_a = await technology.run(context_a)
+
+    job_b = await _make_job(session_factory)
+    await _seed_finding(
+        session_factory, job_b, kind="dns.ns", fingerprint="fp-ns-b", collector="dns_doh",
+        normalized_value_json={"nameservers": ["ns1.cloudflare.com"]},
+    )
+    context_b = make_context(session_factory, _never_called_gateway(), target_type=TargetType.DOMAIN, target_normalized="example.com", collector="technology", job_id=job_b)
+    findings_b = await technology.run(context_b)
+
+    assert len(findings_a) == 1 and len(findings_b) == 1
+    assert findings_a[0].fingerprint == findings_b[0].fingerprint
+    assert findings_a[0].normalized_value == findings_b[0].normalized_value
+    # The supporting Finding row IDs are genuinely different between the two
+    # runs (seeded fresh each time) - that difference belongs in raw_evidence only.
+    assert findings_a[0].raw_evidence["supporting_finding_ids"] != findings_b[0].raw_evidence["supporting_finding_ids"]
