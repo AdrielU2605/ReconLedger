@@ -28,7 +28,9 @@ If you need that, it belongs in a separate, explicitly authorized lab project wi
 and controls - not bolted onto a passive OSINT tool.
 
 See [docs/PRD.md](docs/PRD.md) for the full requirements, safety boundary, and architecture this
-was built against.
+was built against, and [docs/VERIFICATION_WALKTHROUGH.md](docs/VERIFICATION_WALKTHROUGH.md) for a
+real, recorded run through the acceptance walkthrough - including a real provider failure, a real
+recovery via retry, and a real bug it caught along the way.
 
 ## What It Does
 
